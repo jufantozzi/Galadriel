@@ -170,6 +170,11 @@ api-doc: api-doc-build
 		--mount type=bind,source=${DIR}/spec/api,target=/app/api,readonly \
 		galadriel-api-doc:latest
 
+generate-oapi:
+	oapi-codegen --config=spec/api/schemas.cfg.yaml spec/api/schemas.yaml
+    oapi-codegen --config=spec/api/harvester.cfg.yaml spec/api/harvester.yaml
+    oapi-codegen --config=spec/api/management.cfg.yaml spec/api/management.yaml
+
 test: test-unit
 
 test-unit:

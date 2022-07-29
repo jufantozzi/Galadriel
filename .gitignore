@@ -49,6 +49,9 @@
 # Local History for Visual Studio Code
 .history/
 
+# Local configuration files for IntelliJ IDE's
+.idea/
+
 ### VisualStudioCode Patch ###
 # Ignore all local history of files
 .history

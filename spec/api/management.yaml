@@ -21,7 +21,11 @@ servers:
   - url: http://localhost:32208/v1
 tags:
   - name: members
-    description: Manage Galadriel Members
+    description: Manage galadriel members
+  - name: memberships
+    description: Manage galadriel memberships
+  - name: federation-groups
+    description: Manage galadriel federation group
 paths:
   /members:
     post:
@@ -140,12 +144,384 @@ paths:
           $ref: "#/components/responses/429Error"
         500:
           $ref: "#/components/responses/500Error"
+  /memberships:
+    post:
+      tags:
+        - memberships
+      description: Create Membership
+      operationId: createMembership
+      requestBody:
+        required: true
+        content:
+          application/json; charset=utf-8:
+            schema:
+              $ref: "#/components/schemas/Membership"
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Membership"
+      responses:
+        201:
+          $ref: "#/components/responses/201MembershipCreated"
+        400:
+          $ref: "#/components/responses/400Error"
+        401:
+          $ref: "#/components/responses/401Error"
+        403:
+          $ref: "#/components/responses/403Error"
+        405:
+          $ref: "#/components/responses/405Error"
+        406:
+          $ref: "#/components/responses/406Error"
+        415:
+          $ref: "#/components/responses/415Error"
+        429:
+          $ref: "#/components/responses/429Error"
+        500:
+          $ref: "#/components/responses/500Error"
+    get:
+      tags:
+        - memberships
+      description: Returns all the Memberships
+      operationId: getMemberships
+      parameters:
+        - $ref: "#/components/parameters/TrustDomain"
+        - $ref: "#/components/parameters/Status"
+      responses:
+        200:
+          $ref: "#/components/responses/200MembershipRead"
+        400:
+          $ref: "#/components/responses/400Error"
+        401:
+          $ref: "#/components/responses/401Error"
+        403:
+          $ref: "#/components/responses/403Error"
+        405:
+          $ref: "#/components/responses/405Error"
+        406:
+          $ref: "#/components/responses/406Error"
+        429:
+          $ref: "#/components/responses/429Error"
+        500:
+          $ref: "#/components/responses/500Error"
+  /memberships/{MembershipId}:
+    patch:
+      tags:
+        - memberships
+      description: Updates a Membership
+      operationId: updateMembership
+      parameters:
+        - $ref: "#/components/parameters/MembershipId"
+      requestBody:
+        required: true
+        content:
+          application/json; charset=utf-8:
+            schema:
+              $ref: "#/components/schemas/Membership"
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Membership"
+      responses:
+        200:
+          $ref: "#/components/responses/200MembershipRead"
+        400:
+          $ref: "#/components/responses/400Error"
+        401:
+          $ref: "#/components/responses/401Error"
+        403:
+          $ref: "#/components/responses/403Error"
+        405:
+          $ref: "#/components/responses/405Error"
+        406:
+          $ref: "#/components/responses/406Error"
+        429:
+          $ref: "#/components/responses/429Error"
+        500:
+          $ref: "#/components/responses/500Error"
+    delete:
+      tags:
+        - memberships
+      description: Delete a Membership
+      operationId: deleteMembership
+      parameters:
+        - $ref: "#/components/parameters/MembershipId"
+      responses:
+        204:
+          $ref: "#/components/responses/204MembershipDeleted"
+        400:
+          $ref: "#/components/responses/400Error"
+        401:
+          $ref: "#/components/responses/401Error"
+        403:
+          $ref: "#/components/responses/403Error"
+        405:
+          $ref: "#/components/responses/405Error"
+        406:
+          $ref: "#/components/responses/406Error"
+        429:
+          $ref: "#/components/responses/429Error"
+        500:
+          $ref: "#/components/responses/500Error"
+  /federationGroups:
+    post:
+      tags:
+        - federation-groups
+      description: Create FederationGroup
+      operationId: createFederationGroup
+      requestBody:
+        required: true
+        content:
+          application/json; charset=utf-8:
+            schema:
+              $ref: "#/components/schemas/FederationGroup"
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FederationGroup"
+      responses:
+        201:
+          $ref: "#/components/responses/201FederationGroupCreated"
+        400:
+          $ref: "#/components/responses/400Error"
+        401:
+          $ref: "#/components/responses/401Error"
+        403:
+          $ref: "#/components/responses/403Error"
+        405:
+          $ref: "#/components/responses/405Error"
+        406:
+          $ref: "#/components/responses/406Error"
+        415:
+          $ref: "#/components/responses/415Error"
+        429:
+          $ref: "#/components/responses/429Error"
+        500:
+          $ref: "#/components/responses/500Error"
+    get:
+      tags:
+        - federation-groups
+      description: Returns all the FederationGroups
+      operationId: getFederationGroups
+      parameters:
+        - $ref: "#/components/parameters/TrustDomain"
+        - $ref: "#/components/parameters/Status"
+      responses:
+        200:
+          $ref: "#/components/responses/200FederationGroupRead"
+        400:
+          $ref: "#/components/responses/400Error"
+        401:
+          $ref: "#/components/responses/401Error"
+        403:
+          $ref: "#/components/responses/403Error"
+        405:
+          $ref: "#/components/responses/405Error"
+        406:
+          $ref: "#/components/responses/406Error"
+        429:
+          $ref: "#/components/responses/429Error"
+        500:
+          $ref: "#/components/responses/500Error"
+  /federationGroups/{FederationGroupId}:
+    patch:
+      tags:
+        - federation-groups
+      description: Updates a FederationGroup
+      operationId: updateFederationGroup
+      parameters:
+        - $ref: "#/components/parameters/FederationGroupId"
+      requestBody:
+        required: true
+        content:
+          application/json; charset=utf-8:
+            schema:
+              $ref: "#/components/schemas/FederationGroup"
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FederationGroup"
+      responses:
+        200:
+          $ref: "#/components/responses/200FederationGroupRead"
+        400:
+          $ref: "#/components/responses/400Error"
+        401:
+          $ref: "#/components/responses/401Error"
+        403:
+          $ref: "#/components/responses/403Error"
+        405:
+          $ref: "#/components/responses/405Error"
+        406:
+          $ref: "#/components/responses/406Error"
+        429:
+          $ref: "#/components/responses/429Error"
+        500:
+          $ref: "#/components/responses/500Error"
+    delete:
+      tags:
+        - federation-groups
+      description: Delete a FederationGroup
+      operationId: deleteFederationGroup
+      parameters:
+        - $ref: "#/components/parameters/FederationGroupId"
+      responses:
+        204:
+          $ref: "#/components/responses/204FederationGroupDeleted"
+        400:
+          $ref: "#/components/responses/400Error"
+        401:
+          $ref: "#/components/responses/401Error"
+        403:
+          $ref: "#/components/responses/403Error"
+        405:
+          $ref: "#/components/responses/405Error"
+        406:
+          $ref: "#/components/responses/406Error"
+        429:
+          $ref: "#/components/responses/429Error"
+        500:
+          $ref: "#/components/responses/500Error"
+  /relationships:
+    post:
+      tags:
+        - relationships
+      description: Create Relationship
+      operationId: createRelationship
+      requestBody:
+        required: true
+        content:
+          application/json; charset=utf-8:
+            schema:
+              $ref: "#/components/schemas/Relationship"
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Relationship"
+      responses:
+        201:
+          $ref: "#/components/responses/201RelationshipCreated"
+        400:
+          $ref: "#/components/responses/400Error"
+        401:
+          $ref: "#/components/responses/401Error"
+        403:
+          $ref: "#/components/responses/403Error"
+        405:
+          $ref: "#/components/responses/405Error"
+        406:
+          $ref: "#/components/responses/406Error"
+        415:
+          $ref: "#/components/responses/415Error"
+        429:
+          $ref: "#/components/responses/429Error"
+        500:
+          $ref: "#/components/responses/500Error"
+    get:
+      tags:
+        - relationships
+      description: Returns all the Relationships
+      operationId: getRelationships
+      parameters:
+        - $ref: "#/components/parameters/TrustDomain"
+        - $ref: "#/components/parameters/Status"
+      responses:
+        200:
+          $ref: "#/components/responses/200RelationshipRead"
+        400:
+          $ref: "#/components/responses/400Error"
+        401:
+          $ref: "#/components/responses/401Error"
+        403:
+          $ref: "#/components/responses/403Error"
+        405:
+          $ref: "#/components/responses/405Error"
+        406:
+          $ref: "#/components/responses/406Error"
+        429:
+          $ref: "#/components/responses/429Error"
+        500:
+          $ref: "#/components/responses/500Error"
+  /relationships/{RelationshipId}:
+    patch:
+      tags:
+        - relationships
+      description: Updates a Relationship
+      operationId: updateRelationship
+      parameters:
+        - $ref: "#/components/parameters/RelationshipId"
+      requestBody:
+        required: true
+        content:
+          application/json; charset=utf-8:
+            schema:
+              $ref: "#/components/schemas/Relationship"
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Relationship"
+      responses:
+        200:
+          $ref: "#/components/responses/200RelationshipRead"
+        400:
+          $ref: "#/components/responses/400Error"
+        401:
+          $ref: "#/components/responses/401Error"
+        403:
+          $ref: "#/components/responses/403Error"
+        405:
+          $ref: "#/components/responses/405Error"
+        406:
+          $ref: "#/components/responses/406Error"
+        429:
+          $ref: "#/components/responses/429Error"
+        500:
+          $ref: "#/components/responses/500Error"
+    delete:
+      tags:
+        - relationships
+      description: Delete a Relationship
+      operationId: deleteRelationship
+      parameters:
+        - $ref: "#/components/parameters/RelationshipId"
+      responses:
+        204:
+          $ref: "#/components/responses/204RelationshipDeleted"
+        400:
+          $ref: "#/components/responses/400Error"
+        401:
+          $ref: "#/components/responses/401Error"
+        403:
+          $ref: "#/components/responses/403Error"
+        405:
+          $ref: "#/components/responses/405Error"
+        406:
+          $ref: "#/components/responses/406Error"
+        429:
+          $ref: "#/components/responses/429Error"
+        500:
+          $ref: "#/components/responses/500Error"
 components:
   parameters:
     MemberId:
       name: MemberId
       in: path
       description: Id of the SPIRE server to update
+      required: true
+      schema:
+        type: string
+    MembershipId:
+      name: MembershipId
+      in: path
+      description: Id of the membership to update
+      required: true
+      schema:
+        type: string
+    FederationGroupId:
+      name: FederationGroupId
+      in: path
+      description: Id of the federation group to update
+      required: true
+      schema:
+        type: string
+    RelationshipId:
+      name: RelationshipId
+      in: path
+      description: Id of the relationship to update
       required: true
       schema:
         type: string
@@ -187,6 +563,66 @@ components:
             $ref: "#/components/schemas/Member"
     204MemberDeleted:
       description: "Member Deleted"
+    200MembershipRead:
+      description: "Membership Read"
+      content:
+        application/json; charset=utf-8:
+          schema:
+            $ref: "#/components/schemas/MembershipList"
+        application/json:
+          schema:
+            $ref: "#/components/schemas/MembershipList"
+    201MembershipCreated:
+      description: "Membership Created"
+      content:
+        application/json; charset=utf-8:
+          schema:
+            $ref: "#/components/schemas/Membership"
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Membership"
+    204MembershipDeleted:
+      description: "Membership Deleted"
+    200FederationGroupRead:
+      description: "FederationGroup Read"
+      content:
+        application/json; charset=utf-8:
+          schema:
+            $ref: "#/components/schemas/FederationGroupList"
+        application/json:
+          schema:
+            $ref: "#/components/schemas/FederationGroupList"
+    201FederationGroupCreated:
+      description: "FederationGroup Created"
+      content:
+        application/json; charset=utf-8:
+          schema:
+            $ref: "#/components/schemas/FederationGroup"
+        application/json:
+          schema:
+            $ref: "#/components/schemas/FederationGroup"
+    204FederationGroupDeleted:
+      description: "FederationGroup Deleted"
+    200RelationshipRead:
+      description: "Relationship Read"
+      content:
+        application/json; charset=utf-8:
+          schema:
+            $ref: "#/components/schemas/RelationshipList"
+        application/json:
+          schema:
+            $ref: "#/components/schemas/RelationshipList"
+    201RelationshipCreated:
+      description: "Relationship Created"
+      content:
+        application/json; charset=utf-8:
+          schema:
+            $ref: "#/components/schemas/Relationship"
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Relationship"
+    204RelationshipDeleted:
+      description: "Relationship Deleted"
     400Error:
       description: "Bad request"
       content:
@@ -263,6 +699,93 @@ components:
         - trustdomain
         - description
         - status
+    MembershipList:
+      type: "array"
+      items:
+          $ref: "#/components/schemas/Member"
+    Membership:
+      # A Membership represents a particular SPIRE server's presence in a FederationGroup
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        memberId:
+          type: integer
+          format: int64
+        federationGroupId:
+          type: integer
+          format: int64
+        status:
+          type: string
+          enum:
+            - active
+            - inactive
+      required:
+        - memberId
+        - federationGroupId
+        - status
+    FederationGroupList:
+      type: "array"
+      items:
+        $ref: "#/components/schemas/FederationGroup"
+    FederationGroup:
+      # A Federation Group represents a bridge for its Members, allowing relationships to be established
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+          format: string
+        status:
+          type: string
+          format: string
+          enum:
+            - inactive
+            - active
+      required:
+        - id
+        - name
+    RelationshipList:
+      type: "array"
+      items:
+        schema:
+          $ref: ".schemas.yaml#/components/schemas/FederationRelationship"
+    Relationship:
+      # Represents a federated relationship between SPIRE server
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        federationGroupId:
+          type: integer
+          format: int64
+        spireServer:
+          type: string
+          format: string
+        spireServerFederatedWith:
+          type: string
+          format: string
+        spireServerFederatedWithConsent:
+          type: string
+          format: string
+        spireServerConsent:
+          type: string
+          format: string
+        status:
+          type: string
+          enum:
+            - active
+            - inactive
+            - invited
+      required:
+        - id
+        - federationGroupId
+        - spireServer
+        - spireServerFederatedWith
     Error:
       type: "object"
       properties:

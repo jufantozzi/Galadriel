@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"github.com/HewlettPackard/galadriel/pkg/common"
 	"github.com/HewlettPackard/galadriel/pkg/server/datastore"
 	"github.com/google/uuid"
@@ -106,26 +105,22 @@ func (c serverClient) CreateRelationship(rel common.Relationship) (*datastore.Re
 func (c serverClient) GenerateAccessToken(memberID uuid.UUID) (*datastore.AccessToken, error) {
 	b, err := json.Marshal(common.Member{ID: memberID})
 	if err != nil {
-		fmt.Println("1a")
 		return nil, err
 	}
 	r, err := c.client.Post("http://unix/token", "application/json", bytes.NewBuffer(b))
 	if err != nil {
-		fmt.Println("1b")
 		return nil, err
 	}
 	defer r.Body.Close()
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		fmt.Println("2b")
 		return nil, err
 	}
 
 	createdToken := &datastore.AccessToken{}
 	err = json.Unmarshal(body, createdToken)
 	if err != nil {
-		fmt.Println("3c")
 		return nil, err
 	}
 	return createdToken, nil

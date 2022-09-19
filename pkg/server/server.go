@@ -6,6 +6,7 @@ import (
 	"github.com/HewlettPackard/galadriel/pkg/common/util"
 	"github.com/HewlettPackard/galadriel/pkg/server/catalog"
 	"github.com/HewlettPackard/galadriel/pkg/server/endpoints"
+	"github.com/sirupsen/logrus"
 )
 
 // Server represents a Galadriel Server.
@@ -54,6 +55,7 @@ func (s *Server) newEndpointsServer(cat catalog.Catalog) (endpoints.Server, erro
 		TCPAddress:   s.config.TCPAddress,
 		LocalAddress: s.config.LocalAddress,
 		Catalog:      cat,
+		Log:          logrus.StandardLogger(),
 	}
 
 	return endpoints.New(config)

@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/HewlettPackard/galadriel/pkg/common"
-	"github.com/HewlettPackard/galadriel/pkg/server/datastore"
-	"github.com/google/uuid"
 	"io"
 	"net"
 	"net/http"
+
+	"github.com/HewlettPackard/galadriel/pkg/common"
+	"github.com/HewlettPackard/galadriel/pkg/server/datastore"
+	"github.com/google/uuid"
 )
 
 // ServerLocalClient represents a local client of the Galadriel Server.
@@ -54,6 +55,7 @@ func (c serverClient) CreateMember(m common.Member) (*datastore.Member, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	defer r.Body.Close()
 
 	b, err := io.ReadAll(r.Body)
@@ -86,6 +88,7 @@ func (c serverClient) CreateRelationship(rel common.Relationship) (*datastore.Re
 	if err != nil {
 		return nil, err
 	}
+
 	defer r.Body.Close()
 
 	b, err := io.ReadAll(r.Body)
@@ -107,10 +110,12 @@ func (c serverClient) GenerateAccessToken(memberID uuid.UUID) (*datastore.Access
 	if err != nil {
 		return nil, err
 	}
+
 	r, err := c.client.Post("http://unix/token", "application/json", bytes.NewBuffer(b))
 	if err != nil {
 		return nil, err
 	}
+
 	defer r.Body.Close()
 
 	body, err := io.ReadAll(r.Body)
@@ -123,6 +128,7 @@ func (c serverClient) GenerateAccessToken(memberID uuid.UUID) (*datastore.Access
 	if err != nil {
 		return nil, err
 	}
+
 	return createdToken, nil
 }
 

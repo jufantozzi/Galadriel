@@ -4,15 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"time"
+
 	"github.com/HewlettPackard/galadriel/pkg/common"
 	"github.com/HewlettPackard/galadriel/pkg/common/util"
 	"github.com/HewlettPackard/galadriel/pkg/server/datastore"
 	"github.com/labstack/echo/v4"
 	"github.com/sirupsen/logrus"
-	"io"
-	"net"
-	"net/http"
-	"time"
 )
 
 // Server manages the UDS and TCP endpoints lifecycle
@@ -91,6 +92,7 @@ func (e *Endpoints) createMemberHandler(ctx context.Context) {
 			w.WriteHeader(500)
 			return
 		}
+
 		memberReq := &common.Member{}
 		err = json.Unmarshal(body, &memberReq)
 		if err != nil {
@@ -98,12 +100,14 @@ func (e *Endpoints) createMemberHandler(ctx context.Context) {
 			w.WriteHeader(500)
 			return
 		}
+
 		token, err := util.GenerateToken()
 		if err != nil {
 			e.Log.Errorf("failed generating token: %v", err)
 			w.WriteHeader(500)
 			return
 		}
+
 		memberReq.Tokens = append(memberReq.Tokens, common.AccessToken{Token: token})
 		m, err := e.DataStore.CreateMember(ctx, memberReq)
 		if err != nil {
@@ -134,6 +138,7 @@ func (e *Endpoints) createRelationshipHandler(ctx context.Context) {
 			w.WriteHeader(500)
 			return
 		}
+
 		relationshipReq := &common.Relationship{}
 		err = json.Unmarshal(body, &relationshipReq)
 		if err != nil {
@@ -171,6 +176,7 @@ func (e *Endpoints) generateTokenHandler(ctx context.Context) {
 			w.WriteHeader(500)
 			return
 		}
+
 		m := &common.Member{}
 		err = json.Unmarshal(body, m)
 		if err != nil {
@@ -180,6 +186,10 @@ func (e *Endpoints) generateTokenHandler(ctx context.Context) {
 		}
 
 		token, err := util.GenerateToken()
+		if err != nil {
+			e.Log.Errorf("failed generating token: %v", err)
+		}
+
 		at, err := e.DataStore.CreateAccessToken(
 			ctx, &common.AccessToken{Token: token, Expiry: time.Now()}, m.ID,
 		)
@@ -188,6 +198,7 @@ func (e *Endpoints) generateTokenHandler(ctx context.Context) {
 			w.WriteHeader(500)
 			return
 		}
+
 		tokenBytes, err := json.Marshal(at)
 		if err != nil {
 			e.Log.Errorf("failed marshalling token: %v", err)

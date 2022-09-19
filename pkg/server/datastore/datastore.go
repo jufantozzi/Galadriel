@@ -3,10 +3,11 @@ package datastore
 import (
 	"context"
 	"fmt"
-	"github.com/HewlettPackard/galadriel/pkg/common"
-	"github.com/google/uuid"
 	"sync"
 	"time"
+
+	"github.com/HewlettPackard/galadriel/pkg/common"
+	"github.com/google/uuid"
 )
 
 type DataStore interface {
@@ -58,10 +59,12 @@ func (s *MemStore) CreateMember(_ context.Context, member *common.Member) (*Memb
 	for _, t := range member.Tokens {
 		tokens = append(tokens, AccessToken{Token: t.Token})
 	}
+
 	id, err := uuid.NewUUID()
 	if err != nil {
 		return nil, err
 	}
+
 	m := Member{
 		ID:          id,
 		Name:        member.Name,
@@ -77,7 +80,13 @@ func (s *MemStore) CreateRelationship(_ context.Context, rel *common.Relationshi
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	id, err := uuid.NewUUID()
+	if err != nil {
+		return nil, err
+	}
+
 	s.relationship = append(s.relationship, Relationship{
+		ID:      id,
 		MemberA: rel.MemberB,
 		MemberB: rel.MemberB,
 	})

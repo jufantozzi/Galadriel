@@ -88,7 +88,6 @@ func (c serverClient) CreateRelationship(rel common.Relationship) (*datastore.Re
 	if err != nil {
 		return nil, err
 	}
-
 	defer r.Body.Close()
 
 	b, err := io.ReadAll(r.Body)

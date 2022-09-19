@@ -59,7 +59,6 @@ func (s *MemStore) CreateMember(_ context.Context, member *common.Member) (*Memb
 	for _, t := range member.Tokens {
 		tokens = append(tokens, AccessToken{Token: t.Token})
 	}
-
 	id, err := uuid.NewUUID()
 	if err != nil {
 		return nil, err

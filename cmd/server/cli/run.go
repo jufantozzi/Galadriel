@@ -3,7 +3,10 @@ package cli
 import (
 	"context"
 	"fmt"
+	"github.com/HewlettPackard/galadriel/pkg/common/telemetry"
+	"github.com/HewlettPackard/galadriel/pkg/common/util"
 	"github.com/HewlettPackard/galadriel/pkg/server"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"os"
 	"os/signal"
@@ -28,6 +31,10 @@ func NewRunCmd() *cobra.Command {
 			s := server.New(config)
 
 			ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+			ctx = util.WithFields(ctx, logrus.Fields{
+				telemetry.SubsystemName: telemetry.GaladrielServer,
+				"DataDir":               config.DataDir,
+			})
 			defer stop()
 
 			err = s.Run(ctx)

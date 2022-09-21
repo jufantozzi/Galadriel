@@ -5,12 +5,10 @@ import (
 	"io"
 	"net"
 
-	"github.com/HewlettPackard/galadriel/pkg/common/telemetry"
 	"github.com/HewlettPackard/galadriel/pkg/common/util"
 	"github.com/HewlettPackard/galadriel/pkg/server"
 	"github.com/hashicorp/hcl"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -61,8 +59,6 @@ func NewServerConfig(c *Config) (*server.Config, error) {
 	}
 
 	sc.LocalAddress = socketAddr
-	sc.Log = logrus.WithField(telemetry.SubsystemName, telemetry.GaladrielServer)
-
 	return sc, nil
 }
 

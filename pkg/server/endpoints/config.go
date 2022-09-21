@@ -6,7 +6,7 @@ import (
 	"net"
 )
 
-// Config represents the configuration of the Galadriel Server Endpoints
+// Config represents the configuration of the Galadriel Server EndpointHandler
 type Config struct {
 	// TPCAddr is the address to bind the TCP listener to.
 	TCPAddress *net.TCPAddr

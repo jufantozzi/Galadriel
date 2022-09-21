@@ -3,6 +3,7 @@ package catalog
 import (
 	"context"
 	"github.com/HewlettPackard/galadriel/pkg/common/telemetry"
+	"github.com/HewlettPackard/galadriel/pkg/server/controller"
 	"github.com/HewlettPackard/galadriel/pkg/server/datastore"
 	"github.com/sirupsen/logrus"
 )
@@ -13,11 +14,16 @@ type Catalog interface {
 }
 
 type Repository struct {
-	DataStore datastore.DataStore
-	log       logrus.FieldLogger
+	DataStore        datastore.DataStore
+	ControllerClient controller.Client
+	log              logrus.FieldLogger
 }
 
 func (r *Repository) GetDataStore() datastore.DataStore {
+	return r.DataStore
+}
+
+func (r *Repository) GetControllerManager() datastore.DataStore {
 	return r.DataStore
 }
 
@@ -32,7 +38,6 @@ type Config struct {
 
 func Load(ctx context.Context, config Config) (*Repository, error) {
 	memStore := datastore.MemStore{}
-
 	re := &Repository{
 		DataStore: &memStore,
 		log:       logrus.StandardLogger(),

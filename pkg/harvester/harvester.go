@@ -35,7 +35,7 @@ func (h *Harvester) Run(ctx context.Context) error {
 		return errors.New("token is required to connect the Harvester to the Galadriel Server")
 	}
 
-	galadrielClient, err := client.NewGaladrielServerClient(h.config.ServerAddress)
+	galadrielClient, err := client.NewGaladrielServerClient(h.config.ServerAddress, token)
 	if err != nil {
 		return err
 	}

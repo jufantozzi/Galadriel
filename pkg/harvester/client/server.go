@@ -24,9 +24,8 @@ type GaladrielServerClient interface {
 }
 
 type client struct {
-	c       *http.Client
-	address string
 	c       http.Client
+	address string
 	token   string
 	logger  logrus.FieldLogger
 }

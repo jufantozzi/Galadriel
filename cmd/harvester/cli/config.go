@@ -2,13 +2,15 @@ package cli
 
 import (
 	"fmt"
+	"io"
+	"time"
+
 	"github.com/HewlettPackard/galadriel/pkg/common/telemetry"
 	"github.com/HewlettPackard/galadriel/pkg/common/util"
 	"github.com/HewlettPackard/galadriel/pkg/harvester"
 	"github.com/hashicorp/hcl"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"io"
 )
 
 const (
@@ -20,8 +22,9 @@ type Config struct {
 }
 
 type harvesterConfig struct {
-	SpireSocketPath string `hcl:"spire_socket_path"`
-	ServerAddress   string `hcl:"server_address"`
+	SpireSocketPath       string `hcl:"spire_socket_path"`
+	ServerAddress         string `hcl:"server_address"`
+	BundleUpdatesInterval string `hcl:"bundle_updates_interval"`
 }
 
 // ParseConfig reads a configuration from the Reader and parses it
@@ -49,9 +52,14 @@ func NewHarvesterConfig(c *Config) (*harvester.Config, error) {
 		return nil, err
 	}
 
-	sc.SpireAddress = spireAddr
+	buInt, err := time.ParseDuration(c.Harvester.BundleUpdatesInterval)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse bundle updates interval: %v", err)
+	}
 
+	sc.SpireAddress = spireAddr
 	sc.ServerAddress = c.Harvester.ServerAddress
+	sc.BundleUpdatesInterval = buInt
 
 	sc.Log = logrus.WithField(telemetry.SubsystemName, telemetry.Harvester)
 

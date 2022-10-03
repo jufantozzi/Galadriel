@@ -46,10 +46,11 @@ func (h *Harvester) Run(ctx context.Context) error {
 	}
 
 	config := &controller.Config{
-		ServerAddress:   h.config.ServerAddress,
-		SpireSocketPath: h.config.SpireAddress,
-		Log:             h.config.Log.WithField(telemetry.SubsystemName, telemetry.HarvesterController),
-		Metrics:         h.config.metrics,
+		ServerAddress:         h.config.ServerAddress,
+		SpireSocketPath:       h.config.SpireAddress,
+		Log:                   h.config.Log.WithField(telemetry.SubsystemName, telemetry.HarvesterController),
+		Metrics:               h.config.metrics,
+		BundleUpdatesInterval: h.config.BundleUpdatesInterval,
 	}
 	c, err := controller.NewHarvesterController(ctx, config)
 	if err != nil {

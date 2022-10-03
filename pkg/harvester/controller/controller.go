@@ -5,10 +5,13 @@ import (
 	"net"
 	"time"
 
+	"github.com/HewlettPackard/galadriel/pkg/common"
 	"github.com/HewlettPackard/galadriel/pkg/common/telemetry"
+	"github.com/HewlettPackard/galadriel/pkg/common/util"
 	"github.com/HewlettPackard/galadriel/pkg/harvester/client"
 	"github.com/HewlettPackard/galadriel/pkg/harvester/spire"
 	"github.com/sirupsen/logrus"
+	"github.com/spiffe/go-spiffe/v2/bundle/spiffebundle"
 )
 
 // HarvesterController represents the component responsible for handling
@@ -18,19 +21,22 @@ type HarvesterController struct {
 	logger logrus.FieldLogger
 	spire  spire.SpireServer
 	server client.GaladrielServerClient
+	config *Config
 }
 
 // Config represents the configurations for the Harvester Controller
 type Config struct {
-	ServerAddress   string
-	SpireSocketPath net.Addr
-	Log             logrus.FieldLogger
-	Metrics         telemetry.MetricServer
+	ServerAddress         string
+	SpireSocketPath       net.Addr
+	Log                   logrus.FieldLogger
+	Metrics               telemetry.MetricServer
+	BundleUpdatesInterval time.Duration
 }
 
 func NewHarvesterController(ctx context.Context, config *Config) (*HarvesterController, error) {
 	sc := spire.NewLocalSpireServer(ctx, config.SpireSocketPath)
-	gc, err := client.NewGaladrielServerClient(config.ServerAddress)
+	// TODO: add token
+	gc, err := client.NewGaladrielServerClient(config.ServerAddress, "TokenHere")
 	if err != nil {
 		return nil, err
 	}
@@ -38,6 +44,7 @@ func NewHarvesterController(ctx context.Context, config *Config) (*HarvesterCont
 	return &HarvesterController{
 		spire:  sc,
 		server: gc,
+		config: config,
 		logger: logrus.WithField(telemetry.SubsystemName, telemetry.HarvesterController),
 	}, nil
 }
@@ -48,18 +55,62 @@ func (c *HarvesterController) Run(ctx context.Context) error {
 	go c.run(ctx)
 
 	<-ctx.Done()
+	c.logger.Debug("Done")
+
 	return nil
 }
 
 func (c *HarvesterController) run(ctx context.Context) {
-	ticker := time.NewTicker(2 * time.Second)
+	err := util.RunTasks(ctx, []func(context.Context) error{
+		c.notifyBundleUpdates,
+	})
+	if err != nil {
+		c.logger.Error(err)
+	}
+}
+
+func (c *HarvesterController) notifyBundleUpdates(ctx context.Context) error {
+	t := time.NewTicker(c.config.BundleUpdatesInterval)
+	var currentBundle *spiffebundle.Bundle
+
 	for {
 		select {
-		case <-ticker.C:
-			telemetry.Count(ctx, telemetry.HarvesterController, telemetry.TrustBundle, telemetry.Add)
+		case <-t.C:
+			b, changed := c.bundleHasChanged(ctx, currentBundle)
+			if changed {
+				c.logger.Info("Bundle has changed, pushing to Galadriel")
+
+				x509b, err := b.X509Bundle().Marshal()
+				if err != nil {
+					c.logger.Error("failed to marshal X.509 bundle: %v", err)
+				}
+
+				err = c.server.PostBundle(ctx, &common.PostBundleRequest{
+					TrustDomain: b.TrustDomain().String(),
+					TrustBundle: x509b,
+				})
+				if err != nil {
+					c.logger.Errorf("failed to push X.509 bundle: %v", err)
+				}
+
+				currentBundle = b
+			}
 		case <-ctx.Done():
-			c.logger.Debug("Done")
-			return
+			return nil
 		}
 	}
+}
+
+func (c *HarvesterController) bundleHasChanged(ctx context.Context, current *spiffebundle.Bundle) (*spiffebundle.Bundle, bool) {
+	b, err := c.spire.GetBundle(ctx)
+	if err != nil {
+		c.logger.Errorf("failed to check bundle updates: %v", err)
+		return nil, false
+	}
+
+	if !current.Equal(b) {
+		return b, true
+	}
+
+	return nil, false
 }

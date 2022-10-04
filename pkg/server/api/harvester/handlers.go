@@ -86,7 +86,7 @@ func (s *echoServer) postBundleHandler(ctx echo.Context) error {
 		return err
 	}
 
-	receivedHarvesterState := common.PostBundleBody{}
+	receivedHarvesterState := common.PostBundleRequest{}
 	err = json.Unmarshal(body, &receivedHarvesterState)
 	if err != nil {
 		logger.Error("failed to unmarshal state: ", err)

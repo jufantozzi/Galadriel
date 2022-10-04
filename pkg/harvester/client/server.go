@@ -40,7 +40,7 @@ func NewGaladrielServerClient(address, token string) (GaladrielServerClient, err
 }
 
 func (c *client) Connect(ctx context.Context, token string) error {
-	req, err := http.NewRequestWithContext(ctx, "CONNECT", fmt.Sprintf("http://%s/onboard", c.address), nil)
+	req, err := http.NewRequestWithContext(ctx, "CONNECT", fmt.Sprintf("%s/onboard", c.address), nil)
 	if err != nil {
 		return err
 	}

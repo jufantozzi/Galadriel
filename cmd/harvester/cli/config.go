@@ -86,4 +86,8 @@ func (c *Config) setDefaults() {
 	if c.Harvester.SpireSocketPath == "" {
 		c.Harvester.SpireSocketPath = defaultSpireSocketPath
 	}
+
+	if c.Harvester.BundleUpdatesInterval == "" {
+		c.Harvester.BundleUpdatesInterval = "30s"
+	}
 }

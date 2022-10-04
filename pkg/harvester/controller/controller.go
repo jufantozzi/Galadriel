@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"net"
 	"time"
 
@@ -28,15 +29,15 @@ type HarvesterController struct {
 type Config struct {
 	ServerAddress         string
 	SpireSocketPath       net.Addr
+	AccessToken           string
+	BundleUpdatesInterval time.Duration
 	Log                   logrus.FieldLogger
 	Metrics               telemetry.MetricServer
-	BundleUpdatesInterval time.Duration
 }
 
 func NewHarvesterController(ctx context.Context, config *Config) (*HarvesterController, error) {
 	sc := spire.NewLocalSpireServer(ctx, config.SpireSocketPath)
-	// TODO: add token
-	gc, err := client.NewGaladrielServerClient(config.ServerAddress, "TokenHere")
+	gc, err := client.NewGaladrielServerClient(config.ServerAddress, config.AccessToken)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +65,7 @@ func (c *HarvesterController) run(ctx context.Context) {
 	err := util.RunTasks(ctx, []func(context.Context) error{
 		c.notifyBundleUpdates,
 	})
-	if err != nil {
+	if err != nil && !errors.Is(err, context.Canceled) {
 		c.logger.Error(err)
 	}
 }

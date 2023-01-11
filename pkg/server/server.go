@@ -3,6 +3,8 @@ package server
 import (
 	"context"
 	"errors"
+	"github.com/HewlettPackard/galadriel/pkg/server/controller"
+	"github.com/google/uuid"
 
 	"github.com/HewlettPackard/galadriel/pkg/common/telemetry"
 	"github.com/HewlettPackard/galadriel/pkg/common/util"
@@ -12,6 +14,8 @@ import (
 
 // Server represents a Galadriel Server.
 type Server struct {
+	requestLockCh chan uuid.UUID
+
 	config *Config
 }
 
@@ -39,6 +43,8 @@ func (s *Server) run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	serverController, err := controller.NewServerController()
 
 	err = util.RunTasks(ctx, endpointsServer.ListenAndServe)
 	if errors.Is(err, context.Canceled) {

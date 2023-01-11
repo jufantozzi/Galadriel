@@ -25,7 +25,8 @@ type Config struct {
 type harvesterConfig struct {
 	SpireSocketPath       string `hcl:"spire_socket_path"`
 	ServerAddress         string `hcl:"server_address"`
-	BundleUpdatesInterval string `hcl:"bundle_updates_interval"`
+	BundleUpdatesInterval string `hcl:"bundle_updates_interval"` // TODO: Max update interval
+	Mode                  string `hcl:"operating_mode"`
 	LogLevel              string `hcl:"log_level"`
 }
 

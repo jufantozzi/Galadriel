@@ -24,6 +24,9 @@ type Config struct {
 	// Access token for connecting to Galadriel Server
 	AccessToken string
 
+	// Operating mode for the Harvester. If deployment topology uses SPIRE High Availability, .
+	IsHighAvailability bool
+	
 	// How often to check for bundle rotation
 	BundleUpdatesInterval time.Duration
 

@@ -30,6 +30,7 @@ type Config struct {
 	SpireSocketPath       net.Addr
 	AccessToken           string
 	BundleUpdatesInterval time.Duration
+	Mode                  string
 	Logger                logrus.FieldLogger
 }
 
@@ -51,7 +52,12 @@ func NewHarvesterController(ctx context.Context, config *Config) (*HarvesterCont
 func (c *HarvesterController) Run(ctx context.Context) error {
 	c.logger.Info("Starting harvester controller")
 
-	go c.run(ctx)
+	switch c.config.Mode {
+	case "HA":
+		go c.runHA(ctx)
+	default:
+		go c.run(ctx)
+	}
 
 	<-ctx.Done()
 	c.logger.Debug("Shutting down...")
@@ -60,6 +66,18 @@ func (c *HarvesterController) Run(ctx context.Context) error {
 }
 
 func (c *HarvesterController) run(ctx context.Context) {
+	federatedBundlesInterval := time.Second * 10
+
+	err := util.RunTasks(ctx,
+		watcher.BuildSelfBundleWatcher(c.config.BundleUpdatesInterval, c.server, c.spire),
+		watcher.BuildFederatedBundlesWatcher(federatedBundlesInterval, c.server, c.spire),
+	)
+	if err != nil && !errors.Is(err, context.Canceled) {
+		c.logger.Error(err)
+	}
+}
+
+func (c *HarvesterController) runHA(ctx context.Context) {
 	federatedBundlesInterval := time.Second * 10
 
 	err := util.RunTasks(ctx,

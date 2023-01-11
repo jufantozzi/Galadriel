@@ -3,6 +3,7 @@ package endpoints
 import (
 	"context"
 	"fmt"
+	"github.com/google/uuid"
 	"net"
 	"net/http"
 
@@ -21,10 +22,15 @@ type Server interface {
 }
 
 type Endpoints struct {
-	TCPAddress *net.TCPAddr
-	LocalAddr  net.Addr
-	DataStore  datastore.DataStore
-	Logger     logrus.FieldLogger
+	TCPAddress       *net.TCPAddr
+	LocalAddr        net.Addr
+	DataStore        datastore.DataStore
+	RequestLockInCh  chan<- uuid.UUID
+	RequestLockOutCh <-chan struct {
+		memberID    uuid.UUID
+		lockGranted bool
+	}
+	Logger logrus.FieldLogger
 }
 
 func New(c *Config) (*Endpoints, error) {

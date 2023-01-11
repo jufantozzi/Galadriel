@@ -46,6 +46,7 @@ func (h *Harvester) Run(ctx context.Context) error {
 		SpireSocketPath:       h.config.SpireAddress,
 		AccessToken:           h.config.AccessToken,
 		BundleUpdatesInterval: h.config.BundleUpdatesInterval,
+		Mode:                  h.config.Mode,
 		Logger:                h.config.Logger.WithField(telemetry.SubsystemName, telemetry.HarvesterController),
 	}
 	c, err := controller.NewHarvesterController(ctx, config)

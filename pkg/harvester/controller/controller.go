@@ -27,6 +27,7 @@ type HarvesterController struct {
 // Config represents the configurations for the Harvester Controller
 type Config struct {
 	ServerAddress         string
+	RootCAPath            string
 	SpireSocketPath       net.Addr
 	AccessToken           string
 	BundleUpdatesInterval time.Duration
@@ -35,7 +36,7 @@ type Config struct {
 
 func NewHarvesterController(ctx context.Context, config *Config) (*HarvesterController, error) {
 	sc := spire.NewLocalSpireServer(ctx, config.SpireSocketPath)
-	gc, err := client.NewGaladrielServerClient(config.ServerAddress, config.AccessToken)
+	gc, err := client.NewGaladrielServerClient(config.ServerAddress, config.AccessToken, config.RootCAPath)
 	if err != nil {
 		return nil, err
 	}
@@ -65,6 +66,7 @@ func (c *HarvesterController) run(ctx context.Context) {
 	err := util.RunTasks(ctx,
 		watcher.BuildSelfBundleWatcher(c.config.BundleUpdatesInterval, c.server, c.spire),
 		watcher.BuildFederatedBundlesWatcher(federatedBundlesInterval, c.server, c.spire),
+		watcher.BuildJWTWatcher(c.server),
 	)
 	if err != nil && !errors.Is(err, context.Canceled) {
 		c.logger.Error(err)

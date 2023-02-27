@@ -44,6 +44,8 @@ func (s *Server) newEndpointsServer() (endpoints.Server, error) {
 	config := &endpoints.Config{
 		TCPAddress:          s.config.TCPAddress,
 		LocalAddress:        s.config.LocalAddress,
+		CertPath:     s.config.CertPath,
+		CertKeyPath:  s.config.CertKeyPath,
 		DatastoreConnString: s.config.DBConnString,
 		Logger:              s.config.Logger.WithField(telemetry.SubsystemName, telemetry.Endpoints),
 	}

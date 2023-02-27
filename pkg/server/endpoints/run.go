@@ -2,6 +2,8 @@ package endpoints
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"fmt"
 	"net"
 	"net/http"
@@ -23,6 +25,8 @@ type Server interface {
 type Endpoints struct {
 	TCPAddress *net.TCPAddr
 	LocalAddr  net.Addr
+	CertPath    string
+	CertKeyPath string
 	Datastore  datastore.Datastore
 	Logger     logrus.FieldLogger
 }
@@ -40,6 +44,8 @@ func New(c *Config) (*Endpoints, error) {
 	return &Endpoints{
 		TCPAddress: c.TCPAddress,
 		LocalAddr:  c.LocalAddress,
+		CertPath:    c.CertPath,
+		CertKeyPath: c.CertKeyPath,
 		Datastore:  ds,
 		Logger:     c.Logger,
 	}, nil
@@ -64,17 +70,33 @@ func (e *Endpoints) runTCPServer(ctx context.Context) error {
 
 	e.addTCPHandlers(server)
 
-	server.Use(middleware.KeyAuth(func(key string, c echo.Context) (bool, error) {
-		return e.validateToken(c, key)
-	}))
+	mAuthConfig := middleware.KeyAuthWithConfig(middleware.KeyAuthConfig{
+		Validator: func(key string, c echo.Context) (bool, error) { return e.validateToken(c, key) },
+		// onboard route validates through a specific, single-use token
+		Skipper: func(c echo.Context) bool { return c.Path() == "/onboard" },
+	})
 
-	e.Logger.Infof("Starting TCP Server on %s", e.TCPAddress.String())
+	server.Use(mAuthConfig)
+
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return err
+	}
+
+	// add signing key to context
+	server.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			c.Set("jwt_key", privateKey)
+			return nil
+		}
+	})
+
+	e.Logger.Infof("Starting secure TCP Server on %s", e.TCPAddress.String())
 	errChan := make(chan error)
 	go func() {
-		errChan <- server.Start(e.TCPAddress.String())
+		errChan <- server.StartTLS(e.TCPAddress.String(), e.CertPath, e.CertKeyPath)
 	}()
 
-	var err error
 	select {
 	case err = <-errChan:
 		e.Logger.WithError(err).Error("TCP Server stopped prematurely")
@@ -99,7 +121,7 @@ func (e *Endpoints) runUDSServer(ctx context.Context) error {
 
 	e.addHandlers()
 
-	e.Logger.Infof("Starting UDS Server on %s", e.LocalAddr.String())
+	e.Logger.Infof("Starting UDS Server on '%s'", e.LocalAddr.String())
 	errChan := make(chan error)
 	go func() {
 		errChan <- server.Serve(l)

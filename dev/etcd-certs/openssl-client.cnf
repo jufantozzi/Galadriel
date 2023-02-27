@@ -1,0 +1,19 @@
+# openssl-client.cnf
+
+[ req ]
+default_bits = 2048
+default_keyfile = client-key.pem
+default_md = sha256
+distinguished_name = req_distinguished_name
+req_extensions = v3_req
+
+[ req_distinguished_name ]
+commonName = galadriel-harvester
+
+[ v3_req ]
+basicConstraints = CA:FALSE
+keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+subjectAltName = DNS:galadriel-harvester
+subjectAltName = IP:172.23.0.4
+subjectKeyIdentifier = hash
+

@@ -170,6 +170,38 @@ docker-build-harvester:
 ## Builds all docker images.
 docker-build: docker-build-server docker-build-harvester
 
+dev/etcd-certs:
+	mkdir -p dev/etcd-certs
+
+## Generate CA, server and client certificates to test etcd TLS
+generate-etcd-certs: dev/etcd-certs
+	# generate root certificate
+	openssl genrsa -out dev/etcd-certs/ca-key.pem 2048
+	openssl req -new -x509 -nodes -key dev/etcd-certs/ca-key.pem -sha256 -days 3650 -out dev/etcd-certs/ca.pem \
+ 		-subj "/C=US/ST=CA/L=San Francisco/O=My Company, Inc./CN=my-ca"
+	# generate client certificate
+	openssl genrsa -out dev/etcd-certs/client-key.pem 2048
+	openssl req -new -key dev/etcd-certs/client-key.pem \
+		-out dev/etcd-certs/client.csr \
+		-subj "/CN=galadriel-harvester" \
+		-config dev/etcd-certs/openssl-client.cnf
+	openssl x509 -req -in dev/etcd-certs/client.csr \
+		-CA dev/etcd-certs/ca.pem -CAkey dev/etcd-certs/ca-key.pem -CAcreateserial \
+		-out dev/etcd-certs/client.pem -days 365 -sha256 \
+		-extfile dev/etcd-certs/openssl-client.cnf \
+		-extensions v3_req
+	# generate server certificate
+	openssl genrsa -out dev/etcd-certs/server-key.pem 2048
+	openssl req -new -key dev/etcd-certs/server-key.pem \
+		-out dev/etcd-certs/server.csr \
+		-subj "/CN=localhost" \
+		-config dev/etcd-certs/openssl-server.cnf
+	openssl x509 -req -in dev/etcd-certs/server.csr \
+		-CA dev/etcd-certs/ca.pem -CAkey dev/etcd-certs/ca-key.pem -CAcreateserial \
+		-out dev/etcd-certs/server.pem -days 365 -sha256 \
+		-extfile dev/etcd-certs/openssl-server.cnf \
+		-extensions v3_req
+
 #------------------------------------------------------------------------
 # Document file
 #------------------------------------------------------------------------

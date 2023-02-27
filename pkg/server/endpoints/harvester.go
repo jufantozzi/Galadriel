@@ -3,21 +3,58 @@ package endpoints
 import (
 	"bytes"
 	"context"
+	"crypto/rsa"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"strings"
+	"time"
 
 	"github.com/HewlettPackard/galadriel/pkg/common"
 	"github.com/HewlettPackard/galadriel/pkg/common/entity"
 	"github.com/HewlettPackard/galadriel/pkg/common/util"
+
 	"github.com/google/uuid"
+	"github.com/golang-jwt/jwt"
 	"github.com/labstack/echo/v4"
 	"github.com/spiffe/go-spiffe/v2/bundle/spiffebundle"
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 )
 
 const tokenKey = "token"
+
+func (e *Endpoints) onboardHandler(ctx echo.Context) error {
+	// authenticate join token
+	authHeader := ctx.Request().Header.Get(echo.HeaderAuthorization)
+	if !strings.Contains("Bearer ", authHeader) {
+		err := errors.New("auth error: bad authorization header")
+		e.Logger.Error(err)
+		return err
+	}
+
+	token := authHeader[len("Bearer "):]
+	t, err := e.DataStore.GetAccessToken(context.TODO(), token)
+	if err != nil {
+		e.Logger.Errorf("invalid token: %s\n", token)
+		return err
+	}
+	e.Logger.Debugf("Token valid for trust domain: %s\n", t.TrustDomain)
+
+	key, ok := ctx.Get("jwt_key").(*rsa.PrivateKey)
+	if !ok {
+		err := errors.New("auth error: error asserting jwt private key")
+		e.handleTcpError(ctx, err.Error())
+		return err
+	}
+
+	signedToken, err := util.GenerateJWT(util.GenerateJWTClaims(t.TrustDomain.String(), defaultJWTExpiry), key)
+
+	ctx.Response().Write([]byte("Token: " + signedToken))
+
+	e.Logger.Info("Harvester connected")
+	return nil
+}
 
 func (e *Endpoints) postBundleHandler(ctx echo.Context) error {
 	e.Logger.Debug("Receiving post bundle request")
@@ -207,6 +244,36 @@ func (e *Endpoints) syncFederatedBundleHandler(ctx echo.Context) error {
 	}
 
 	return nil
+}
+
+func (e *Endpoints) validateToken(ctx echo.Context, token string) (bool, error) {
+	key, ok := ctx.Get("jwt_key").(*rsa.PrivateKey)
+	if !ok {
+		err := errors.New("auth error: error asserting jwt private key")
+		e.handleTcpError(ctx, err.Error())
+		return false, err
+	}
+
+	parsedToken, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+			return nil, fmt.Errorf("auth error: unexpected jwt signing method: %v", token.Header["alg"])
+		}
+
+		return key, nil
+	})
+	if err != nil {
+		err := errors.New("auth error: error parsing harvester JWT token")
+		e.handleTcpError(ctx, err.Error())
+		return false, err
+	}
+
+	if err := parsedToken.Claims.Valid(); err != nil {
+		return false, fmt.Errorf("auth error: token is invalid: %v", err)
+	}
+
+	e.Logger.Debugf("Parsed token: %v", *parsedToken)
+
+	return true, nil
 }
 
 func getFederatedTrustDomains(relationships []*entity.Relationship, tdID uuid.UUID) []uuid.UUID {

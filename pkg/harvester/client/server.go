@@ -3,14 +3,17 @@ package client
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-
 	"github.com/HewlettPackard/galadriel/pkg/common"
 	"github.com/HewlettPackard/galadriel/pkg/common/telemetry"
 	"github.com/sirupsen/logrus"
+	"io"
+	"net/http"
+	"os"
+	"strings"
 )
 
 const (
@@ -19,6 +22,7 @@ const (
 	postBundlePath     = "/bundle"
 	postBundleSyncPath = "/bundle/sync"
 	onboardPath        = "/onboard"
+	tokenPath          = "/token"
 )
 
 // GaladrielServerClient represents a client to connect to Galadriel Server
@@ -26,6 +30,7 @@ type GaladrielServerClient interface {
 	SyncFederatedBundles(context.Context, *common.SyncBundleRequest) (*common.SyncBundleResponse, error)
 	PostBundle(context.Context, *common.PostBundleRequest) error
 	Connect(ctx context.Context, token string) error
+	RefreshToken(ctx context.Context) error
 }
 
 type client struct {
@@ -35,10 +40,26 @@ type client struct {
 	logger  logrus.FieldLogger
 }
 
-func NewGaladrielServerClient(address, token string) (GaladrielServerClient, error) {
+func NewGaladrielServerClient(address, token, rootCAPath string) (GaladrielServerClient, error) {
+	// Load the root CA certificate.
+	caCert, err := os.ReadFile(rootCAPath)
+	if err != nil {
+		return nil, err
+	}
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCert)
+
 	return &client{
-		c:       *http.DefaultClient,
-		address: "http://" + address,
+		c: http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					MinVersion: tls.VersionTLS12,
+					RootCAs:    caCertPool,
+					ServerName: strings.Split(address, ":")[0],
+				},
+			},
+		},
+		address: "https://" + address,
 		token:   token,
 		logger:  logrus.WithField(telemetry.SubsystemName, telemetry.GaladrielServerClient),
 	}, nil
@@ -58,13 +79,51 @@ func (c *client) Connect(ctx context.Context, token string) error {
 	}
 	defer resp.Body.Close()
 
+	bodyString, err := readBody(resp)
+	if err != nil {
+		return fmt.Errorf("failed to read response body: %v", err)
+	}
+
 	if resp.StatusCode != 200 {
-		bodyString, err := readBody(resp)
-		if err != nil {
-			return fmt.Errorf("failed to read response body: %v", err)
-		}
 		return fmt.Errorf("failed to connect to Galadriel Server: %s", bodyString)
 	}
+
+	c.token = bodyString[len("Token: "):]
+
+	c.logger.Info("Connected to Galadriel Server")
+	return nil
+}
+
+// RefreshToken requests the Galadriel Server for a new JWT token
+func (c *client) RefreshToken(ctx context.Context) error {
+	url := c.address + tokenPath
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+
+	resp, err := c.c.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	bodyString, err := readBody(resp)
+	if err != nil {
+		return fmt.Errorf("failed to read response body: %v", err)
+	}
+
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("failed to connect to Galadriel Server: %s", bodyString)
+	}
+
+	if bodyString == "" {
+		c.logger.Debug("Token is updated")
+		return nil
+	}
+
+	c.token = bodyString[len("Token: "):]
 
 	c.logger.Info("Connected to Galadriel Server")
 	return nil

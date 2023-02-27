@@ -14,6 +14,12 @@ type Config struct {
 	// Address of Galadriel Server to be reached locally
 	LocalAddress net.Addr
 
+	// Path for server's certificate. Used for harvester TLS connection.
+	CertPath string
+
+	// Path for server's certificate key. Used for harvester TLS connection
+	CertKeyPath string
+
 	// Directory to store runtime data
 	DataDir string
 

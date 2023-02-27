@@ -31,7 +31,7 @@ func (h *Harvester) Run(ctx context.Context) error {
 		return errors.New("token is required to connect the Harvester to the Galadriel Server")
 	}
 
-	galadrielClient, err := client.NewGaladrielServerClient(h.config.ServerAddress, h.config.JoinToken)
+	galadrielClient, err := client.NewGaladrielServerClient(h.config.ServerAddress, h.config.JoinToken, h.config.RootCAPath)
 	if err != nil {
 		return err
 	}
@@ -43,6 +43,7 @@ func (h *Harvester) Run(ctx context.Context) error {
 
 	config := &controller.Config{
 		ServerAddress:         h.config.ServerAddress,
+		RootCAPath:            h.config.RootCAPath,
 		SpireSocketPath:       h.config.SpireAddress,
 		AccessToken:           h.config.JoinToken,
 		BundleUpdatesInterval: h.config.BundleUpdatesInterval,

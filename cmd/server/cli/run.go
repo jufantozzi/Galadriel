@@ -75,6 +75,7 @@ func LoadConfig(cmd *cobra.Command) (*server.Config, error) {
 
 	logrus.SetLevel(logLevel)
 	logrus.SetOutput(os.Stdout)
+	logrus.WithField("log_level", logLevel).Info("Configuration loaded")
 
 	return sc, nil
 }

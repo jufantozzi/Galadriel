@@ -8,7 +8,7 @@ import (
 	"github.com/HewlettPackard/galadriel/pkg/harvester/client"
 )
 
-const bundleRefreshInterval time.Duration = time.Minute * 1
+const bundleRefreshInterval = time.Second * 10
 
 func BuildJWTWatcher(server client.GaladrielServerClient) util.RunnableTask {
 	return func(ctx context.Context) error {

@@ -10,6 +10,7 @@ import (
 
 	"github.com/HewlettPackard/galadriel/pkg/common/util"
 	"github.com/HewlettPackard/galadriel/pkg/server/datastore"
+
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/sirupsen/logrus"
@@ -23,12 +24,13 @@ type Server interface {
 }
 
 type Endpoints struct {
-	TCPAddress *net.TCPAddr
-	LocalAddr  net.Addr
+	TCPAddress  *net.TCPAddr
+	LocalAddr   net.Addr
 	CertPath    string
 	CertKeyPath string
-	Datastore  datastore.Datastore
-	Logger     logrus.FieldLogger
+	Datastore   datastore.Datastore
+	JWTKey      *rsa.PrivateKey
+	Logger      logrus.FieldLogger
 }
 
 func New(c *Config) (*Endpoints, error) {
@@ -72,24 +74,9 @@ func (e *Endpoints) runTCPServer(ctx context.Context) error {
 
 	mAuthConfig := middleware.KeyAuthWithConfig(middleware.KeyAuthConfig{
 		Validator: func(key string, c echo.Context) (bool, error) { return e.validateToken(c, key) },
-		// onboard route validates through a specific, single-use token
-		Skipper: func(c echo.Context) bool { return c.Path() == "/onboard" },
+		Skipper:   func(c echo.Context) bool { return c.Path() == "/onboard" },
 	})
-
 	server.Use(mAuthConfig)
-
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return err
-	}
-
-	// add signing key to context
-	server.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			c.Set("jwt_key", privateKey)
-			return nil
-		}
-	})
 
 	e.Logger.Infof("Starting secure TCP Server on %s", e.TCPAddress.String())
 	errChan := make(chan error)
@@ -149,7 +136,8 @@ func (e *Endpoints) addHandlers() {
 }
 
 func (e *Endpoints) addTCPHandlers(server *echo.Echo) {
-	server.CONNECT("/onboard", e.onboardHandler)
+	server.GET("/onboard", e.onboardHandler)
+	server.GET("/token", e.refreshJWTHandler)
 	server.POST("/bundle", e.postBundleHandler)
 	server.POST("/bundle/sync", e.syncFederatedBundleHandler)
 }

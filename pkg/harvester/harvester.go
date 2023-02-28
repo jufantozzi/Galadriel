@@ -49,10 +49,7 @@ func (h *Harvester) Run(ctx context.Context) error {
 		BundleUpdatesInterval: h.config.BundleUpdatesInterval,
 		Logger:                h.config.Logger.WithField(telemetry.SubsystemName, telemetry.HarvesterController),
 	}
-	c, err := controller.NewHarvesterController(ctx, config)
-	if err != nil {
-		return err
-	}
+	c := controller.NewHarvesterController(ctx, galadrielClient, config)
 
 	err = util.RunTasks(ctx, c.Run)
 	if errors.Is(err, context.Canceled) {

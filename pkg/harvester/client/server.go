@@ -7,13 +7,14 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"github.com/HewlettPackard/galadriel/pkg/common"
-	"github.com/HewlettPackard/galadriel/pkg/common/telemetry"
-	"github.com/sirupsen/logrus"
 	"io"
 	"net/http"
 	"os"
-	"strings"
+
+	"github.com/HewlettPackard/galadriel/pkg/common"
+	"github.com/HewlettPackard/galadriel/pkg/common/telemetry"
+
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -55,7 +56,6 @@ func NewGaladrielServerClient(address, token, rootCAPath string) (GaladrielServe
 				TLSClientConfig: &tls.Config{
 					MinVersion: tls.VersionTLS12,
 					RootCAs:    caCertPool,
-					ServerName: strings.Split(address, ":")[0],
 				},
 			},
 		},
@@ -67,7 +67,7 @@ func NewGaladrielServerClient(address, token, rootCAPath string) (GaladrielServe
 
 func (c *client) Connect(ctx context.Context, token string) error {
 	url := c.address + onboardPath
-	req, err := http.NewRequestWithContext(ctx, http.MethodConnect, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return err
 	}
@@ -88,6 +88,9 @@ func (c *client) Connect(ctx context.Context, token string) error {
 		return fmt.Errorf("failed to connect to Galadriel Server: %s", bodyString)
 	}
 
+	if len("Token: ") > len(bodyString) {
+		return fmt.Errorf("invalid token format: %s", bodyString)
+	}
 	c.token = bodyString[len("Token: "):]
 
 	c.logger.Info("Connected to Galadriel Server")
@@ -118,14 +121,14 @@ func (c *client) RefreshToken(ctx context.Context) error {
 		return fmt.Errorf("failed to connect to Galadriel Server: %s", bodyString)
 	}
 
-	if bodyString == "" {
+	if len("Token: ") > len(bodyString) {
 		c.logger.Debug("Token is updated")
 		return nil
 	}
 
 	c.token = bodyString[len("Token: "):]
 
-	c.logger.Info("Connected to Galadriel Server")
+	c.logger.Info("Successfully refreshed JWT")
 	return nil
 }
 

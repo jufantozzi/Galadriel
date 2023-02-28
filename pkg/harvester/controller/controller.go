@@ -29,24 +29,17 @@ type Config struct {
 	ServerAddress         string
 	RootCAPath            string
 	SpireSocketPath       net.Addr
-	AccessToken           string
 	BundleUpdatesInterval time.Duration
 	Logger                logrus.FieldLogger
 }
 
-func NewHarvesterController(ctx context.Context, config *Config) (*HarvesterController, error) {
-	sc := spire.NewLocalSpireServer(ctx, config.SpireSocketPath)
-	gc, err := client.NewGaladrielServerClient(config.ServerAddress, config.AccessToken, config.RootCAPath)
-	if err != nil {
-		return nil, err
-	}
-
+func NewHarvesterController(ctx context.Context, gc client.GaladrielServerClient, config *Config) *HarvesterController {
 	return &HarvesterController{
-		spire:  sc,
+		spire:  spire.NewLocalSpireServer(ctx, config.SpireSocketPath),
 		server: gc,
 		config: config,
 		logger: logrus.WithField(telemetry.SubsystemName, telemetry.HarvesterController),
-	}, nil
+	}
 }
 
 func (c *HarvesterController) Run(ctx context.Context) error {

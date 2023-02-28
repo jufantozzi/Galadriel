@@ -3,7 +3,6 @@ package endpoints
 import (
 	"bytes"
 	"context"
-	"crypto/rsa"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -27,8 +26,8 @@ const tokenKey = "token"
 func (e *Endpoints) onboardHandler(ctx echo.Context) error {
 	// authenticate join token
 	authHeader := ctx.Request().Header.Get(echo.HeaderAuthorization)
-	if !strings.Contains("Bearer ", authHeader) {
-		err := errors.New("auth error: bad authorization header")
+	if !strings.Contains(authHeader, "Bearer ") {
+		err := errors.New("auth error: bad authorization header: " + authHeader)
 		e.Logger.Error(err)
 		return err
 	}
@@ -41,42 +40,73 @@ func (e *Endpoints) onboardHandler(ctx echo.Context) error {
 	}
 	e.Logger.Debugf("Token valid for trust domain: %s\n", t.TrustDomain)
 
-	key, ok := ctx.Get("jwt_key").(*rsa.PrivateKey)
+	// generate and sign JWT
+	signedToken, err := util.GenerateJWT(util.GenerateJWTClaims(t.TrustDomain.String(), defaultJWTExpiry), e.JWTKey)
+	if err != nil {
+		e.Logger.Errorf("failed generating JWT: %v\n", err)
+		return err
+	}
+
+	_, err = ctx.Response().Write([]byte("Token: " + signedToken))
+	if err != nil {
+		e.Logger.Errorf("failed responding to harvester: %s\n", token)
+		return err
+	}
+
+	e.Logger.Info("Harvester connected")
+	return nil
+}
+
+func (e *Endpoints) refreshJWTHandler(ctx echo.Context) error {
+	token, ok := ctx.Get("token").(*jwt.Token)
 	if !ok {
-		err := errors.New("auth error: error asserting jwt private key")
+		err := errors.New("error asserting harvester's JWT")
 		e.handleTcpError(ctx, err.Error())
 		return err
 	}
 
 	signedToken, err := util.GenerateJWT(util.GenerateJWTClaims(t.TrustDomain.String(), defaultJWTExpiry), key)
 
-	ctx.Response().Write([]byte("Token: " + signedToken))
+	id, err := spiffeid.FromString(fmt.Sprintf("spiffe://%s", authenticatedTrustDomain))
+	if err != nil {
+		e.handleTcpError(ctx, fmt.Sprintf("failed to create spiffeID '%s': %v", authenticatedTrustDomain, err))
+		return err
+	}
+	// generate and sign JWT
+	signedToken, err := util.GenerateJWT(util.GenerateJWTClaims(id.TrustDomain().String(), defaultJWTExpiry), e.JWTKey)
+	if err != nil {
+		e.Logger.Errorf("failed generating JWT: %v\n", err)
+		return err
+	}
 
-	e.Logger.Info("Harvester connected")
+	e.Logger.Infof("Sending token: %s", "Token: "+signedToken)
+
+	_, err = ctx.Response().Write([]byte("Token: " + signedToken))
+	if err != nil {
+		e.Logger.Errorf("failed responding to harvester: %s\n", token)
+		return err
+	}
+
 	return nil
 }
 
 func (e *Endpoints) postBundleHandler(ctx echo.Context) error {
 	e.Logger.Debug("Receiving post bundle request")
 
-	jt, ok := ctx.Get(tokenKey).(*entity.JoinToken)
+	token, ok := ctx.Get("token").(*jwt.Token)
 	if !ok {
-		err := errors.New("error parsing token")
-		e.handleTCPError(ctx, err.Error())
+		err := errors.New("error asserting harvester's JWT")
+		e.handleTcpError(ctx, err.Error())
 		return err
 	}
-
-	token, err := e.Datastore.FindJoinToken(ctx.Request().Context(), jt.Token)
-	if err != nil {
-		err := errors.New("error looking up token")
-		e.handleTCPError(ctx, err.Error())
-		return err
+	var authenticatedTrustDomain string
+	if claims, ok := token.Claims.(jwt.MapClaims); ok {
+		authenticatedTrustDomain = claims["trust-domain"].(string)
 	}
 
-	authenticatedTD, err := e.Datastore.FindTrustDomainByID(ctx.Request().Context(), token.TrustDomainID)
+	id, err := spiffeid.FromString(fmt.Sprintf("spiffe://%s", authenticatedTrustDomain))
 	if err != nil {
-		err := errors.New("error looking up trust domain")
-		e.handleTCPError(ctx, err.Error())
+		e.handleTcpError(ctx, fmt.Sprintf("failed to create spiffeID '%s': %v", authenticatedTrustDomain, err))
 		return err
 	}
 
@@ -155,16 +185,9 @@ func (e *Endpoints) postBundleHandler(ctx echo.Context) error {
 func (e *Endpoints) syncFederatedBundleHandler(ctx echo.Context) error {
 	e.Logger.Debug("Receiving sync request")
 
-	jt, ok := ctx.Get(tokenKey).(*entity.JoinToken)
+	token, ok := ctx.Get("token").(*jwt.Token)
 	if !ok {
-		err := errors.New("error parsing join token")
-		e.handleTCPError(ctx, err.Error())
-		return err
-	}
-
-	token, err := e.Datastore.FindJoinToken(ctx.Request().Context(), jt.Token)
-	if err != nil {
-		err := errors.New("error looking up token")
+		err := errors.New("error parsing JWT")
 		e.handleTCPError(ctx, err.Error())
 		return err
 	}
@@ -172,6 +195,16 @@ func (e *Endpoints) syncFederatedBundleHandler(ctx echo.Context) error {
 	harvesterTrustDomain, err := e.Datastore.FindTrustDomainByID(ctx.Request().Context(), token.TrustDomainID)
 	if err != nil {
 		e.handleTCPError(ctx, fmt.Sprintf("failed to read body: %v", err))
+		return err
+	}
+	var authenticatedTrustDomain string
+	if claims, ok := token.Claims.(jwt.MapClaims); ok {
+		authenticatedTrustDomain = claims["trust-domain"].(string)
+	}
+
+	id, err := spiffeid.FromString(fmt.Sprintf("spiffe://%s", authenticatedTrustDomain))
+	if err != nil {
+		e.handleTcpError(ctx, fmt.Sprintf("failed to create spiffeID '%s': %v", authenticatedTrustDomain, err))
 		return err
 	}
 
@@ -247,29 +280,24 @@ func (e *Endpoints) syncFederatedBundleHandler(ctx echo.Context) error {
 }
 
 func (e *Endpoints) validateToken(ctx echo.Context, token string) (bool, error) {
-	key, ok := ctx.Get("jwt_key").(*rsa.PrivateKey)
-	if !ok {
-		err := errors.New("auth error: error asserting jwt private key")
-		e.handleTcpError(ctx, err.Error())
-		return false, err
-	}
-
 	parsedToken, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 			return nil, fmt.Errorf("auth error: unexpected jwt signing method: %v", token.Header["alg"])
 		}
 
-		return key, nil
+		return e.JWTKey.Public(), nil
 	})
 	if err != nil {
-		err := errors.New("auth error: error parsing harvester JWT token")
+		err := errors.New("auth error: error parsing harvester JWT token: " + err.Error())
 		e.handleTcpError(ctx, err.Error())
 		return false, err
 	}
 
 	if err := parsedToken.Claims.Valid(); err != nil {
-		return false, fmt.Errorf("auth error: token is invalid: %v", err)
+		return false, fmt.Errorf("auth error: invalid token: %v", err)
 	}
+
+	ctx.Set("token", parsedToken)
 
 	e.Logger.Debugf("Parsed token: %v", *parsedToken)
 

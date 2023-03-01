@@ -7,14 +7,15 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"github.com/HewlettPackard/galadriel/pkg/common"
-	"github.com/HewlettPackard/galadriel/pkg/common/telemetry"
-	"github.com/golang-jwt/jwt"
 	"io"
 	"net/http"
 	"os"
 	"time"
 
+	"github.com/HewlettPackard/galadriel/pkg/common"
+	"github.com/HewlettPackard/galadriel/pkg/common/telemetry"
+
+	"github.com/golang-jwt/jwt"
 	"github.com/sirupsen/logrus"
 )
 
@@ -33,6 +34,7 @@ type GaladrielServerClient interface {
 	PostBundle(context.Context, *common.PostBundleRequest) error
 	Connect(ctx context.Context, token string) error
 	RefreshToken(ctx context.Context) error
+	GetTokenTTL() time.Duration
 }
 
 type client struct {
@@ -145,6 +147,22 @@ func (c *client) RefreshToken(ctx context.Context) error {
 
 	c.logger.Info("Successfully refreshed JWT")
 	return nil
+}
+
+func (c *client) GetTokenTTL() time.Duration {
+	token, _, err := new(jwt.Parser).ParseUnverified(c.token, jwt.MapClaims{})
+	if err != nil {
+		// sanity check, this should be validated before being stored
+		panic("invalid jwt after connecting")
+	}
+
+	iat := token.Claims.(jwt.MapClaims)["iat"].(float64)
+	iatTime := time.Unix(int64(iat), 0)
+
+	exp := token.Claims.(jwt.MapClaims)["exp"].(float64)
+	expTime := time.Unix(int64(exp), 0)
+
+	return expTime.Sub(iatTime)
 }
 
 func (c *client) SyncFederatedBundles(ctx context.Context, req *common.SyncBundleRequest) (*common.SyncBundleResponse, error) {

@@ -8,11 +8,14 @@ import (
 	"github.com/HewlettPackard/galadriel/pkg/harvester/client"
 )
 
-const bundleRefreshInterval = time.Second * 10
+// This defines how frequently we should be asking for new JWTs. The larger this number, more often it will retry.
+// The actual frequency is based on the JWT TTL.
+const retryFactor = 50
 
 func BuildJWTWatcher(server client.GaladrielServerClient) util.RunnableTask {
 	return func(ctx context.Context) error {
-		t := time.NewTicker(bundleRefreshInterval)
+		tokenTTL := server.GetTokenTTL()
+		t := time.NewTicker(tokenTTL / retryFactor)
 		for {
 			select {
 			case <-t.C:

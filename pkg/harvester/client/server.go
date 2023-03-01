@@ -7,12 +7,13 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"github.com/HewlettPackard/galadriel/pkg/common"
+	"github.com/HewlettPackard/galadriel/pkg/common/telemetry"
+	"github.com/golang-jwt/jwt"
 	"io"
 	"net/http"
 	"os"
-
-	"github.com/HewlettPackard/galadriel/pkg/common"
-	"github.com/HewlettPackard/galadriel/pkg/common/telemetry"
+	"time"
 
 	"github.com/sirupsen/logrus"
 )
@@ -88,17 +89,30 @@ func (c *client) Connect(ctx context.Context, token string) error {
 		return fmt.Errorf("failed to connect to Galadriel Server: %s", bodyString)
 	}
 
-	if len("Token: ") > len(bodyString) {
-		return fmt.Errorf("invalid token format: %s", bodyString)
+	// validate token
+	validJWT, err := c.validateJWT(bodyString)
+	if err != nil {
+		return err
 	}
-	c.token = bodyString[len("Token: "):]
+
+	c.token = validJWT
 
 	c.logger.Info("Connected to Galadriel Server")
 	return nil
 }
 
-// RefreshToken requests the Galadriel Server for a new JWT token
+// RefreshToken requests the Galadriel Server for a new JWT token if current token
+// is older than its half-life time.
 func (c *client) RefreshToken(ctx context.Context) error {
+	token, _, err := new(jwt.Parser).ParseUnverified(c.token, jwt.MapClaims{})
+	if err != nil {
+		return fmt.Errorf("failed to parse JWT: %s", err.Error())
+	}
+
+	if !c.shouldRefresh(token) {
+		return nil
+	}
+
 	url := c.address + tokenPath
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -121,12 +135,13 @@ func (c *client) RefreshToken(ctx context.Context) error {
 		return fmt.Errorf("failed to connect to Galadriel Server: %s", bodyString)
 	}
 
-	if len("Token: ") > len(bodyString) {
-		c.logger.Debug("Token is updated")
-		return nil
+	// validate token
+	newToken, err := c.validateJWT(bodyString)
+	if err != nil {
+		return err
 	}
 
-	c.token = bodyString[len("Token: "):]
+	c.token = newToken
 
 	c.logger.Info("Successfully refreshed JWT")
 	return nil
@@ -207,6 +222,43 @@ func (c *client) PostBundle(ctx context.Context, req *common.PostBundleRequest) 
 	}
 
 	return nil
+}
+
+// shouldRefresh calculates if the received token is older than half its expiry date.
+// Tokens older than half of their life should be renewed.
+func (c *client) shouldRefresh(token *jwt.Token) bool {
+	// calculate half-time
+	now := time.Now()
+
+	iat := token.Claims.(jwt.MapClaims)["iat"].(float64)
+	iatTime := time.Unix(int64(iat), 0)
+
+	exp := token.Claims.(jwt.MapClaims)["exp"].(float64)
+	expTime := time.Unix(int64(exp), 0)
+
+	halfLifeTime := expTime.Sub(iatTime) / 2
+	duration := expTime.Sub(now)
+
+	if duration > halfLifeTime {
+		return false
+	}
+
+	return true
+}
+
+// validateJWT returns an error if the received token isn't a parseable JWT.
+func (c *client) validateJWT(bodyString string) (string, error) {
+	if len("Token: ") > len(bodyString) {
+		return "", fmt.Errorf("error validating JWT: invalid response format: %s", bodyString)
+	}
+
+	receivedToken := bodyString[len("Token: "):]
+	_, _, err := new(jwt.Parser).ParseUnverified(receivedToken, jwt.MapClaims{})
+	if err != nil {
+		return "", fmt.Errorf("failed to parse JWT: %s", err.Error())
+	}
+
+	return receivedToken, nil
 }
 
 func readBody(resp *http.Response) (string, error) {

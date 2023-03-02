@@ -5,14 +5,14 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
+	"github.com/labstack/echo/v4/middleware"
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/HewlettPackard/galadriel/pkg/common/util"
 	"github.com/HewlettPackard/galadriel/pkg/server/datastore"
-
 	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
 	"github.com/sirupsen/logrus"
 )
 
@@ -29,7 +29,10 @@ type Endpoints struct {
 	CertPath    string
 	CertKeyPath string
 	Datastore   datastore.Datastore
-	JWTKey      *rsa.PrivateKey
+	JWT         struct {
+		TokenTTL time.Duration
+		Key      *rsa.PrivateKey
+	}
 	Logger      logrus.FieldLogger
 }
 
@@ -43,9 +46,23 @@ func New(c *Config) (*Endpoints, error) {
 		return nil, err
 	}
 
+	jwtKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, err
+	}
+
+	JWT := struct {
+		TokenTTL time.Duration
+		Key      *rsa.PrivateKey
+	}{
+		TokenTTL: c.JwtTTL,
+		Key:      jwtKey,
+	}
+
 	return &Endpoints{
-		TCPAddress: c.TCPAddress,
-		LocalAddr:  c.LocalAddress,
+		TCPAddress:  c.TCPAddress,
+		LocalAddr:   c.LocalAddress,
+		JWT:         JWT,
 		CertPath:    c.CertPath,
 		CertKeyPath: c.CertKeyPath,
 		Datastore:  ds,
@@ -85,7 +102,7 @@ func (e *Endpoints) runTCPServer(ctx context.Context) error {
 	}()
 
 	select {
-	case err = <-errChan:
+	case err := <-errChan:
 		e.Logger.WithError(err).Error("TCP Server stopped prematurely")
 		return err
 	case <-ctx.Done():

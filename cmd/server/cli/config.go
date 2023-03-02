@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"time"
 
 	"github.com/HewlettPackard/galadriel/pkg/common/telemetry"
 	"github.com/HewlettPackard/galadriel/pkg/common/util"
 	"github.com/HewlettPackard/galadriel/pkg/server"
+
 	"github.com/hashicorp/hcl"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -24,6 +26,7 @@ type Config struct {
 type serverConfig struct {
 	ListenAddress string `hcl:"listen_address"`
 	ListenPort    int    `hcl:"listen_port"`
+	JwtTTL        string `hcl:"jwt_ttl"`
 	CertPath      string `hcl:"cert_path"`
 	CertKeyPath   string `hcl:"cert_key_path"`
 	SocketPath    string `hcl:"socket_path"`
@@ -57,14 +60,19 @@ func NewServerConfig(c *Config) (*server.Config, error) {
 		return nil, err
 	}
 
-	sc.TCPAddress = tcpAddr
-
 	socketAddr, err := util.GetUnixAddrWithAbsPath(c.Server.SocketPath)
 	if err != nil {
 		return nil, err
 	}
 
+	jwtTTL, err := time.ParseDuration(c.Server.JwtTTL)
+	if err != nil {
+		return nil, err
+	}
+
+	sc.TCPAddress = tcpAddr
 	sc.LocalAddress = socketAddr
+	sc.JwtTTL = jwtTTL
 	sc.CertPath = c.Server.CertPath
 	sc.CertKeyPath = c.Server.CertKeyPath
 	sc.Logger = logrus.WithField(telemetry.SubsystemName, telemetry.GaladrielServer)
@@ -109,5 +117,9 @@ func (c *Config) setDefaults() {
 
 	if c.Server.LogLevel == "" {
 		c.Server.LogLevel = "INFO"
+	}
+
+	if c.Server.JwtTTL == "" {
+		c.Server.JwtTTL = "1h"
 	}
 }

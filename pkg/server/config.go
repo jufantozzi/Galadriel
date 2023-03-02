@@ -2,17 +2,21 @@ package server
 
 import (
 	"net"
+	"time"
 
 	"github.com/sirupsen/logrus"
 )
 
 // Config conveys configurations for the Galadriel Server
 type Config struct {
-	// Address of Galadriel Server
+	// TCPAddress of Galadriel Server
 	TCPAddress *net.TCPAddr
 
-	// Address of Galadriel Server to be reached locally
+	// LocalAddress of Galadriel Server to be reached locally
 	LocalAddress net.Addr
+
+	// JwtTTL is the ttl to be used when signing JWTs to authenticated harvesters.
+	JwtTTL time.Duration
 
 	// Path for server's certificate. Used for harvester TLS connection.
 	CertPath string

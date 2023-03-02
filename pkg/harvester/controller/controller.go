@@ -11,6 +11,7 @@ import (
 	"github.com/HewlettPackard/galadriel/pkg/harvester/client"
 	"github.com/HewlettPackard/galadriel/pkg/harvester/controller/watcher"
 	"github.com/HewlettPackard/galadriel/pkg/harvester/spire"
+
 	"github.com/sirupsen/logrus"
 )
 
@@ -55,11 +56,12 @@ func (c *HarvesterController) Run(ctx context.Context) error {
 
 func (c *HarvesterController) run(ctx context.Context) {
 	federatedBundlesInterval := time.Second * 10
+	jwtRefreshInterval := time.Second * 10
 
 	err := util.RunTasks(ctx,
 		watcher.BuildSelfBundleWatcher(c.config.BundleUpdatesInterval, c.server, c.spire),
 		watcher.BuildFederatedBundlesWatcher(federatedBundlesInterval, c.server, c.spire),
-		watcher.BuildJWTWatcher(c.server),
+		watcher.BuildJWTWatcher(jwtRefreshInterval, c.server),
 	)
 	if err != nil && !errors.Is(err, context.Canceled) {
 		c.logger.Error(err)

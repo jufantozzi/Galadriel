@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/HewlettPackard/galadriel/pkg/server"
+
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -75,7 +76,12 @@ func LoadConfig(cmd *cobra.Command) (*server.Config, error) {
 
 	logrus.SetLevel(logLevel)
 	logrus.SetOutput(os.Stdout)
-	logrus.WithField("log_level", logLevel).Info("Configuration loaded")
+	logrus.
+		WithField("jwt_ttl", sc.JwtTTL).
+		WithField("cert_path", sc.CertPath).
+		WithField("cert_key_path", sc.CertKeyPath).
+		WithField("log_level", logLevel).
+		Info("Configuration loaded")
 
 	return sc, nil
 }

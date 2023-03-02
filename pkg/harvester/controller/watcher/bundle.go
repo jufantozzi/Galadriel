@@ -12,6 +12,7 @@ import (
 	"github.com/HewlettPackard/galadriel/pkg/common/util"
 	"github.com/HewlettPackard/galadriel/pkg/harvester/client"
 	"github.com/HewlettPackard/galadriel/pkg/harvester/spire"
+
 	"github.com/sirupsen/logrus"
 	"github.com/spiffe/go-spiffe/v2/bundle/spiffebundle"
 )

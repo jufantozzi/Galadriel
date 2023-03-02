@@ -2,28 +2,31 @@ package watcher
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/HewlettPackard/galadriel/pkg/common/util"
 	"github.com/HewlettPackard/galadriel/pkg/harvester/client"
 )
 
-// This defines how frequently we should be asking for new JWTs. The larger this number, more often it will retry.
-// The actual frequency is based on the JWT TTL.
-const retryFactor = 50
-
-func BuildJWTWatcher(server client.GaladrielServerClient) util.RunnableTask {
+func BuildJWTWatcher(jwtRefreshInterval time.Duration, server client.GaladrielServerClient) util.RunnableTask {
 	return func(ctx context.Context) error {
-		tokenTTL := server.GetTokenTTL()
-		t := time.NewTicker(tokenTTL / retryFactor)
+		t := time.NewTicker(jwtRefreshInterval)
+		delay := jwtRefreshInterval
 		for {
 			select {
 			case <-t.C:
 				err := server.RefreshToken(ctx)
+				// retries 5 times, incrementally backing-off, based on jwtRefreshInterval
 				if err != nil {
-					logger.Errorf("Failed to refresh JWT: %v", err)
+					if delay >= jwtRefreshInterval+(5*10*time.Second) {
+						return fmt.Errorf("failed to renew JWT token: %s", err.Error())
+					}
+					time.Sleep(delay)
+					delay = delay + (10 * time.Second)
 					break
 				}
+				delay = jwtRefreshInterval
 			case <-ctx.Done():
 				return nil
 			}

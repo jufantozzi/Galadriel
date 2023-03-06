@@ -40,7 +40,7 @@ func (e *Endpoints) onboardHandler(ctx echo.Context) error {
 		e.Logger.Errorf("invalid token: %s\n", jt)
 		return err
 	}
-	e.Logger.Debugf("Token valid for trust domain: %s\n", jt.TrustDomainName.String())
+	e.Logger.Debugf("Token valid for trust domain: %v\n", jt)
 
 	authenticatedTD, err := e.Datastore.FindTrustDomainByID(ctx.Request().Context(), jt.TrustDomainID)
 
@@ -50,14 +50,6 @@ func (e *Endpoints) onboardHandler(ctx echo.Context) error {
 		e.Logger.Errorf("failed generating JWT: %v\n", err)
 		return err
 	}
-
-	// remove
-	parsedJWT, err := jwt.Parse(signedJWT, func(token *jwt.Token) (interface{}, error) {
-		return e.JWT.Key.Public(), nil
-	})
-
-	e.Logger.Debugf("Giving token:", parsedJWT)
-	// remove
 
 	_, err = ctx.Response().Write([]byte("Token: " + signedJWT))
 	if err != nil {
@@ -186,7 +178,10 @@ func (e *Endpoints) postBundleHandler(ctx echo.Context) error {
 
 	if harvesterReq.Bundle != nil && currentStoredBundle != nil && !bytes.Equal(harvesterReq.Bundle.Digest, currentStoredBundle.Digest) {
 		_, err := e.Datastore.CreateOrUpdateBundle(ctx.Request().Context(), &entity.Bundle{
-			Data: harvesterReq.Bundle.Data,
+			ID:            currentStoredBundle.ID,
+			Data:          harvesterReq.Bundle.Data,
+			Digest:        harvesterReq.Bundle.Digest,
+			TrustDomainID: authenticatedTD.ID.UUID,
 		})
 		if err != nil {
 			e.handleTCPError(ctx, fmt.Sprintf("failed to update trustDomain: %v", err))
@@ -201,7 +196,7 @@ func (e *Endpoints) postBundleHandler(ctx echo.Context) error {
 			TrustDomainID: authenticatedTD.ID.UUID,
 		})
 		if err != nil {
-			e.handleTCPError(ctx, fmt.Sprintf("failed to update trustDomain: %v", err))
+			e.handleTCPError(ctx, fmt.Sprintf("failed to create trustDomain: %v", err))
 			return err
 		}
 
@@ -276,6 +271,19 @@ func (e *Endpoints) syncFederatedBundleHandler(ctx echo.Context) error {
 
 	if len(federatedBundles) == 0 {
 		e.Logger.Debug("No federated bundles yet")
+		response := common.SyncBundleResponse{}
+
+		responseBytes, err := json.Marshal(response)
+		if err != nil {
+			e.handleTCPError(ctx, fmt.Sprintf("failed to marshal response: %v", err))
+			return err
+		}
+		_, err = ctx.Response().Write(responseBytes)
+		if err != nil {
+			e.handleTCPError(ctx, fmt.Sprintf("failed to write response: %v", err))
+			return err
+		}
+
 		return nil
 	}
 

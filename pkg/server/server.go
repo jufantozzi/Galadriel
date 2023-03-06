@@ -6,7 +6,6 @@ import (
 
 	"github.com/HewlettPackard/galadriel/pkg/common/telemetry"
 	"github.com/HewlettPackard/galadriel/pkg/common/util"
-	"github.com/HewlettPackard/galadriel/pkg/server/catalog"
 	"github.com/HewlettPackard/galadriel/pkg/server/endpoints"
 )
 
@@ -45,9 +44,9 @@ func (s *Server) newEndpointsServer() (endpoints.Server, error) {
 	config := &endpoints.Config{
 		TCPAddress:          s.config.TCPAddress,
 		LocalAddress:        s.config.LocalAddress,
-		JwtTTL:       s.config.JwtTTL,
-		CertPath:     s.config.CertPath,
-		CertKeyPath:  s.config.CertKeyPath,
+		JwtTTL:              s.config.JwtTTL,
+		CertPath:            s.config.CertPath,
+		CertKeyPath:         s.config.CertKeyPath,
 		DatastoreConnString: s.config.DBConnString,
 		Logger:              s.config.Logger.WithField(telemetry.SubsystemName, telemetry.Endpoints),
 	}

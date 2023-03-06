@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/HewlettPackard/galadriel/pkg/common/entity"
+	"github.com/google/uuid"
 	"io"
 	"strings"
 
@@ -18,7 +20,10 @@ import (
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 )
 
-const tokenKey = "token"
+const (
+	tokenKey       = "token"
+	spiffeIDPrefix = "spiffe://"
+)
 
 func (e *Endpoints) onboardHandler(ctx echo.Context) error {
 	// authenticate join token
@@ -29,24 +34,34 @@ func (e *Endpoints) onboardHandler(ctx echo.Context) error {
 		return err
 	}
 
-	token := authHeader[len("Bearer "):]
-	t, err := e.DataStore.GetAccessToken(context.TODO(), token)
+	jtString := authHeader[len("Bearer "):]
+	jt, err := e.Datastore.FindJoinToken(context.TODO(), jtString)
 	if err != nil {
-		e.Logger.Errorf("invalid token: %s\n", token)
+		e.Logger.Errorf("invalid token: %s\n", jt)
 		return err
 	}
-	e.Logger.Debugf("Token valid for trust domain: %s\n", t.TrustDomain)
+	e.Logger.Debugf("Token valid for trust domain: %s\n", jt.TrustDomainName.String())
+
+	authenticatedTD, err := e.Datastore.FindTrustDomainByID(ctx.Request().Context(), jt.TrustDomainID)
 
 	// generate and sign JWT
-	signedToken, err := util.GenerateJWT(util.GenerateJWTClaims(t.TrustDomain.String(), e.JWT.TokenTTL), e.JWT.Key)
+	signedJWT, err := util.GenerateJWT(util.GenerateJWTClaims(authenticatedTD.Name.String(), e.JWT.TokenTTL), e.JWT.Key)
 	if err != nil {
 		e.Logger.Errorf("failed generating JWT: %v\n", err)
 		return err
 	}
 
-	_, err = ctx.Response().Write([]byte("Token: " + signedToken))
+	// remove
+	parsedJWT, err := jwt.Parse(signedJWT, func(token *jwt.Token) (interface{}, error) {
+		return e.JWT.Key.Public(), nil
+	})
+
+	e.Logger.Debugf("Giving token:", parsedJWT)
+	// remove
+
+	_, err = ctx.Response().Write([]byte("Token: " + signedJWT))
 	if err != nil {
-		e.Logger.Errorf("failed responding to harvester: %s\n", token)
+		e.Logger.Errorf("failed responding to harvester: %s\n", err.Error())
 		return err
 	}
 
@@ -55,27 +70,26 @@ func (e *Endpoints) onboardHandler(ctx echo.Context) error {
 }
 
 func (e *Endpoints) refreshJWTHandler(ctx echo.Context) error {
-	token, ok := ctx.Get("token").(*jwt.Token)
+	t, ok := ctx.Get(tokenKey).(*jwt.Token)
 	if !ok {
 		err := errors.New("error asserting harvester's JWT")
-		e.handleTcpError(ctx, err.Error())
+		e.handleTCPError(ctx, err.Error())
 		return err
 	}
 
-	signedToken, err := util.GenerateJWT(util.GenerateJWTClaims(t.TrustDomain.String(), defaultJWTExpiry), key)
 	var authenticatedTrustDomain string
-	if claims, ok := token.Claims.(jwt.MapClaims); ok {
+	if claims, ok := t.Claims.(jwt.MapClaims); ok {
 		authenticatedTrustDomain, ok = claims["trust-domain"].(string)
 		if !ok {
 			err := errors.New("error asserting trust-domain from JWT claims")
-			e.handleTcpError(ctx, err.Error())
+			e.handleTCPError(ctx, err.Error())
 			return err
 		}
 	}
 
-	id, err := spiffeid.FromString(fmt.Sprintf("spiffe://%s", authenticatedTrustDomain))
+	id, err := spiffeid.FromString(fmt.Sprintf("%s%s", spiffeIDPrefix, authenticatedTrustDomain))
 	if err != nil {
-		e.handleTcpError(ctx, fmt.Sprintf("failed to create spiffeID '%s': %v", authenticatedTrustDomain, err))
+		e.handleTCPError(ctx, fmt.Sprintf("failed to create spiffeID '%s': %v", authenticatedTrustDomain, err))
 		return err
 	}
 
@@ -84,14 +98,14 @@ func (e *Endpoints) refreshJWTHandler(ctx echo.Context) error {
 	signedToken, err := util.GenerateJWT(jwtClaims, e.JWT.Key)
 	if err != nil {
 		err := fmt.Errorf("failed generating JWT: %v\n", err)
-		e.handleTcpError(ctx, err.Error())
+		e.handleTCPError(ctx, err.Error())
 		return err
 	}
 
 	_, err = ctx.Response().Write([]byte("Token: " + signedToken))
 	if err != nil {
 		err := fmt.Errorf("failed responding to harvester: %w\n", err)
-		e.handleTcpError(ctx, err.Error())
+		e.handleTCPError(ctx, err.Error())
 		return err
 	}
 
@@ -103,22 +117,25 @@ func (e *Endpoints) refreshJWTHandler(ctx echo.Context) error {
 func (e *Endpoints) postBundleHandler(ctx echo.Context) error {
 	e.Logger.Debug("Receiving post bundle request")
 
-	token, ok := ctx.Get("token").(*jwt.Token)
+	// TODO: refactor into assertToken() or smt
+	t, ok := ctx.Get("token").(*jwt.Token)
 	if !ok {
 		err := errors.New("error asserting harvester's JWT")
-		e.handleTcpError(ctx, err.Error())
+		e.handleTCPError(ctx, err.Error())
 		return err
 	}
-	var authenticatedTrustDomain string
-	if claims, ok := token.Claims.(jwt.MapClaims); ok {
-		authenticatedTrustDomain = claims["trust-domain"].(string)
+	var td string
+	if claims, ok := t.Claims.(jwt.MapClaims); ok {
+		td = claims["trust-domain"].(string)
 	}
 
-	id, err := spiffeid.FromString(fmt.Sprintf("spiffe://%s", authenticatedTrustDomain))
+	authenticatedSpiffeID, err := spiffeid.FromString(fmt.Sprintf("%s%s", spiffeIDPrefix, td))
 	if err != nil {
-		e.handleTcpError(ctx, fmt.Sprintf("failed to create spiffeID '%s': %v", authenticatedTrustDomain, err))
+		e.handleTCPError(ctx, fmt.Sprintf("failed to create spiffeID '%s': %v", authenticatedSpiffeID, err))
 		return err
 	}
+
+	authenticatedTD, err := e.Datastore.FindTrustDomainByName(ctx.Request().Context(), authenticatedSpiffeID.TrustDomain())
 
 	body, err := io.ReadAll(ctx.Request().Body)
 	if err != nil {
@@ -133,13 +150,15 @@ func (e *Endpoints) postBundleHandler(ctx echo.Context) error {
 		return err
 	}
 
-	if harvesterReq.TrustDomainName != authenticatedTD.Name {
-		err := fmt.Errorf("authenticated trust domain {%s} does not match trust domain in request: {%s}", harvesterReq.TrustDomainID, token.TrustDomainID)
+	if harvesterReq.TrustDomainName != authenticatedSpiffeID.TrustDomain() {
+		err := fmt.Errorf(
+			"authenticated trust domain {%s} does not match trust domain in request: {%s}",
+			harvesterReq.TrustDomainID, authenticatedSpiffeID.TrustDomain())
 		e.handleTCPError(ctx, err.Error())
 		return err
 	}
 
-	bundle, err := spiffebundle.Parse(authenticatedTD.Name, harvesterReq.Bundle.Data)
+	bundle, err := spiffebundle.Parse(authenticatedSpiffeID.TrustDomain(), harvesterReq.Bundle.Data)
 	if err != nil {
 		e.handleTCPError(ctx, fmt.Sprintf("failed to parse bundle: %v", err))
 		return err
@@ -195,22 +214,24 @@ func (e *Endpoints) postBundleHandler(ctx echo.Context) error {
 func (e *Endpoints) syncFederatedBundleHandler(ctx echo.Context) error {
 	e.Logger.Debug("Receiving sync request")
 
-	token, ok := ctx.Get("token").(*jwt.Token)
+	t, ok := ctx.Get("token").(*jwt.Token)
 	if !ok {
 		err := errors.New("error asserting harvester's JWT")
-		e.handleTcpError(ctx, err.Error())
+		e.handleTCPError(ctx, err.Error())
 		return err
 	}
-	var authenticatedTrustDomain string
-	if claims, ok := token.Claims.(jwt.MapClaims); ok {
-		authenticatedTrustDomain = claims["trust-domain"].(string)
+	var td string
+	if claims, ok := t.Claims.(jwt.MapClaims); ok {
+		td = claims["trust-domain"].(string)
 	}
 
-	id, err := spiffeid.FromString(fmt.Sprintf("spiffe://%s", authenticatedTrustDomain))
+	authenticatedSpiffeID, err := spiffeid.FromString(fmt.Sprintf("%s%s", spiffeIDPrefix, td))
 	if err != nil {
-		e.handleTcpError(ctx, fmt.Sprintf("failed to create spiffeID '%s': %v", authenticatedTrustDomain, err))
+		e.handleTCPError(ctx, fmt.Sprintf("failed to create spiffeID '%s': %v", authenticatedSpiffeID, err))
 		return err
 	}
+
+	authenticatedTD, err := e.Datastore.FindTrustDomainByName(ctx.Request().Context(), authenticatedSpiffeID.TrustDomain())
 
 	body, err := io.ReadAll(ctx.Request().Body)
 	if err != nil {
@@ -226,20 +247,21 @@ func (e *Endpoints) syncFederatedBundleHandler(ctx echo.Context) error {
 	}
 
 	harvesterBundleDigests := receivedHarvesterState.State
+	e.Logger.Debugf("Incoming sync request state: %v", harvesterBundleDigests)
 
-	_, foundSelf := receivedHarvesterState.State[harvesterTrustDomain.Name]
+	_, foundSelf := receivedHarvesterState.State[authenticatedTD.Name]
 	if foundSelf {
 		e.handleTCPError(ctx, "bad request: harvester cannot federate with itself")
 		return err
 	}
 
-	relationships, err := e.Datastore.FindRelationshipsByTrustDomainID(ctx.Request().Context(), harvesterTrustDomain.ID.UUID)
+	relationships, err := e.Datastore.FindRelationshipsByTrustDomainID(ctx.Request().Context(), authenticatedTD.ID.UUID)
 	if err != nil {
 		e.handleTCPError(ctx, fmt.Sprintf("failed to fetch relationships: %v", err))
 		return err
 	}
 
-	federatedTDs := getFederatedTrustDomains(relationships, harvesterTrustDomain.ID.UUID)
+	federatedTDs := getFederatedTrustDomains(relationships, authenticatedTD.ID.UUID)
 
 	if len(federatedTDs) == 0 {
 		e.Logger.Debug("No federated trust domains yet")
@@ -283,17 +305,17 @@ func (e *Endpoints) syncFederatedBundleHandler(ctx echo.Context) error {
 	return nil
 }
 
-func (e *Endpoints) validateToken(ctx echo.Context, token string) (bool, error) {
-	parsedToken, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
-			return nil, fmt.Errorf("auth error: unexpected jwt signing method: %v", token.Header["alg"])
+func (e *Endpoints) validateToken(ctx echo.Context, t string) (bool, error) {
+	parsedToken, err := jwt.Parse(t, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
+			return nil, fmt.Errorf("auth error: unexpected jwt signing method: %v", t.Header["alg"])
 		}
 
 		return e.JWT.Key.Public(), nil
 	})
 	if err != nil {
 		err := errors.New("auth error: error parsing harvester JWT token: " + err.Error())
-		e.handleTcpError(ctx, err.Error())
+		e.handleTCPError(ctx, err.Error())
 		return false, err
 	}
 
@@ -301,9 +323,8 @@ func (e *Endpoints) validateToken(ctx echo.Context, token string) (bool, error) 
 		return false, fmt.Errorf("auth error: invalid token: %v", err)
 	}
 
+	e.Logger.Debugf("Setting token for request: %v", parsedToken.Claims)
 	ctx.Set("token", parsedToken)
-
-	e.Logger.Debugf("Parsed token: %v", *parsedToken)
 
 	return true, nil
 }

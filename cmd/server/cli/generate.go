@@ -35,6 +35,7 @@ var tokenCmd = &cobra.Command{
 		}
 
 		fmt.Println("Join Token: " + at.Token)
+		fmt.Println("TD: " + at.TrustDomainName.String())
 		return nil
 	},
 }

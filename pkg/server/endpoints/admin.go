@@ -10,8 +10,6 @@ import (
 
 	"github.com/HewlettPackard/galadriel/pkg/common/entity"
 	"github.com/HewlettPackard/galadriel/pkg/common/util"
-
-	"github.com/labstack/echo/v4"
 )
 
 func (e *Endpoints) createTrustDomainHandler(w http.ResponseWriter, r *http.Request) {
@@ -224,7 +222,7 @@ func (e *Endpoints) generateTokenHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	token, err := util.GenerateToken()
+	token, err := util.GenerateAccessToken()
 	if err != nil {
 		errMsg := fmt.Sprintf("failed generating token: %v", err)
 		e.handleError(w, errMsg)

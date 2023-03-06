@@ -29,6 +29,7 @@ type HarvesterController struct {
 type Config struct {
 	ServerAddress         string
 	RootCAPath            string
+	AccessToken           string
 	SpireSocketPath       net.Addr
 	BundleUpdatesInterval time.Duration
 	Logger                logrus.FieldLogger
@@ -56,7 +57,7 @@ func (c *HarvesterController) Run(ctx context.Context) error {
 
 func (c *HarvesterController) run(ctx context.Context) {
 	federatedBundlesInterval := time.Second * 10
-	jwtRefreshInterval := time.Second * 10
+	jwtRefreshInterval := time.Minute * 1
 
 	err := util.RunTasks(ctx,
 		watcher.BuildSelfBundleWatcher(c.config.BundleUpdatesInterval, c.server, c.spire),

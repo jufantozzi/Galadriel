@@ -10,6 +10,7 @@ import (
 	"github.com/HewlettPackard/galadriel/pkg/common/util"
 	"github.com/HewlettPackard/galadriel/pkg/harvester/client"
 	"github.com/HewlettPackard/galadriel/pkg/harvester/controller/watcher"
+	"github.com/HewlettPackard/galadriel/pkg/harvester/integrity"
 	"github.com/HewlettPackard/galadriel/pkg/harvester/spire"
 	"github.com/sirupsen/logrus"
 )
@@ -18,10 +19,11 @@ import (
 // the controller loops that will keep sending fresh bundles and configurations
 // to and from SPIRE Server and Galadriel Server.
 type HarvesterController struct {
-	logger logrus.FieldLogger
-	spire  spire.SpireServer
-	server client.GaladrielServerClient
-	config *Config
+	logger   logrus.FieldLogger
+	spire    spire.SpireServer
+	server   client.GaladrielServerClient
+	verifier integrity.Verifier
+	config   *Config
 }
 
 // Config represents the configurations for the Harvester Controller
@@ -36,15 +38,18 @@ type Config struct {
 func NewHarvesterController(ctx context.Context, config *Config) (*HarvesterController, error) {
 	sc := spire.NewLocalSpireServer(ctx, config.SpireSocketPath)
 	gc, err := client.NewGaladrielServerClient(config.ServerAddress, config.AccessToken)
+	verifier, err := integrity.NewLocalReader()
+
 	if err != nil {
 		return nil, err
 	}
 
 	return &HarvesterController{
-		spire:  sc,
-		server: gc,
-		config: config,
-		logger: logrus.WithField(telemetry.SubsystemName, telemetry.HarvesterController),
+		spire:    sc,
+		server:   gc,
+		verifier: verifier,
+		config:   config,
+		logger:   logrus.WithField(telemetry.SubsystemName, telemetry.HarvesterController),
 	}, nil
 }
 

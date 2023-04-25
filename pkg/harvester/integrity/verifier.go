@@ -4,29 +4,34 @@ import (
 	"crypto/x509"
 )
 
-// Verifier is the certificate material provider for signing and validation operations.
+type Signer interface {
+	Sign(payload []byte) (signature []byte, signingCert *x509.Certificate, e error)
+}
+
 type Verifier interface {
-	GetSigningCertificate() (*x509.Certificate, error)
-	GetValidationCertificate() ([]*x509.Certificate, error)
+	Verify(rawBundle, signature []byte, signingCert *x509.Certificate) error
 }
 
-// diskReader provides a disk implementation of Verifier
-type diskReader struct {
-	scPath string
-	vcPath string
+type Key struct {
+	TrustDomainName string
+	Certificate     *x509.Certificate
 }
 
-func NewLocalReader(signingCertificatePath, validationCertificatePath string) (Verifier, error) {
-	return &diskReader{
-		scPath: signingCertificatePath,
-		vcPath: validationCertificatePath,
-	}, nil
+type signer struct{}
+type verifier struct{}
+
+func NewSigner(signingCertificatePath string) (Signer, error) {
+	return &signer{}, nil
 }
 
-func (d *diskReader) GetSigningCertificate() (*x509.Certificate, error) {
-	return nil, nil
+func NewVerifier(signingCertificatePath string) (Verifier, error) {
+	return &verifier{}, nil
 }
 
-func (d *diskReader) GetValidationCertificate() ([]*x509.Certificate, error) {
-	return nil, nil
+func (d *signer) Sign(payload []byte) ([]byte, *x509.Certificate, error) {
+	return payload, nil, nil
+}
+
+func (d *verifier) Verify(rawBundle, signature []byte, signingCert *x509.Certificate) error {
+	return nil
 }

@@ -11,8 +11,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-
-	//"geninterface/repository"
 	"io/ioutil"
 	"math/big"
 	"net/url"
@@ -21,30 +19,32 @@ import (
 	"github.com/andres-erbsen/clock"
 )
 
-// Disk is a SigningCA that generates signing certificates and validation materials
-// Disk is a local signing CA and has access to root keys and root certs via a path.
-type Disk struct {
-	rootSigner       crypto.Signer       // Root Key
-	rootCertificate  *x509.Certificate   // Root Certificate CA
-	validationBundle []*x509.Certificate // List of certificates to be used for validation of signing certificates
+// disk is a SigningCA that generates signing certificates and validation materials and has access to root keys and root certs via a path.
+type disk struct {
+	//rootSigner is the root Key of the signing CA
+	rootSigner crypto.Signer
+	//rootCertificate is the  root certificate of the signing CA
+	rootCertificate *x509.Certificate
+	//validationBundle is the list of certificates to be used for validation of signing certificates
+	validationBundle []*x509.Certificate
 }
 
 type Config struct {
-	CertFilePath           string `hcl:"cert_file_path"`           // Root CA certificate
-	KeyPath                string `hcl:"key_file_path"`            // Root Key
-	ValidationMaterialPath string `hcl:"validation_material_path"` // TrustBundle to validate CA signed material
-
+	//CerFilePath is the path to the root CA certificate
+	CertFilePath string `hcl:"cert_file_path"`
+	//KeyPath is the path to the Root Key
+	KeyPath string `hcl:"key_file_path"`
+	//ValidationMaterialPath is the path to the TrustBundle to validate CA signed material
+	ValidationMaterialPath string `hcl:"validation_material_path"`
 }
 
-func New() (Disk, error) {
-	var disk Disk
-
-	return disk, nil
+// New cretes a new disk that is not configured.
+func New() (*disk, error) {
+	return &disk{}, nil
 }
 
-// Configure sets the values of the Disk structure if valid values are present for the paths
-// This function assumes that config parameter has been parsed out based on hcl rules
-func (dc *Disk) Configure(config *Config) error {
+// Configure sets the values of the Disk structure based on an hcl map.
+func (dc *disk) Configure(config *Config) error {
 
 	if config.KeyPath == "" {
 		return errors.New("key path is not set")
@@ -83,28 +83,30 @@ func getRootKey(keyPath string) (crypto.Signer, error) {
 		return nil, err
 	}
 
-	// Assuming PEM encoded private key
+	// assuming PEM encoded private key
 	var blck *pem.Block
 	blck, _ = pem.Decode(pkbytes)
 	if blck == nil {
 		return nil, errors.New("error decoding private key")
 	}
 
-	pkcs8PrivateKey, err := x509.ParsePKCS8PrivateKey(blck.Bytes) // parses uncrypted private key - returns any key
+	var key interface{}
+	// parses uncrypted private key - returns any key
+	key, err = x509.ParsePKCS8PrivateKey(blck.Bytes)
 	if err != nil {
 		return nil, err
 	}
 
-	switch keyType := pkcs8PrivateKey.(type) {
+	switch keyType := key.(type) {
 	case *rsa.PrivateKey:
 		println("rsa key")
-		return pkcs8PrivateKey.(*rsa.PrivateKey), nil
+		return key.(*rsa.PrivateKey), nil
 	case *ecdsa.PrivateKey:
 		println("ecdsa key")
-		return pkcs8PrivateKey.(*ecdsa.PrivateKey), nil
+		return key.(*ecdsa.PrivateKey), nil
 	case *ed25519.PrivateKey:
 		println("ed25519 key")
-		return pkcs8PrivateKey.(*ed25519.PrivateKey), nil
+		return key.(*ed25519.PrivateKey), nil
 	default:
 		return nil, fmt.Errorf("this type of key is not supported: %s", keyType)
 	}
@@ -156,13 +158,13 @@ func getValidationMaterial(path string) ([]*x509.Certificate, error) {
 	return bundle, nil
 }
 
-func (dc *Disk) RetrieveValidationMaterial() []*x509.Certificate {
+func (dc *disk) RetrieveValidationMaterial() []*x509.Certificate {
 	return dc.validationBundle
 }
 
-func (dc *Disk) IssueSigningCertificate(params *X509CertificateParams) (*x509.Certificate, error) {
+func (dc *disk) IssueSigningCertificate(params *X509CertificateParams) (*x509.Certificate, error) {
 
-	template, err := createX509Template(params.PublicKey, params.Subject, params.URIs, params.DNSNames, params.TTL)
+	template, err := createX509Template(params.PublicKey, params.Subject, params.URIs, params.TTL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create template for Server certificate: %w", err)
 	}
@@ -176,7 +178,7 @@ func (dc *Disk) IssueSigningCertificate(params *X509CertificateParams) (*x509.Ce
 
 }
 
-func createX509Template(publicKey crypto.PublicKey, subject pkix.Name, uris []*url.URL, dnsNames []string, ttl time.Duration) (*x509.Certificate, error) {
+func createX509Template(publicKey crypto.PublicKey, subject pkix.Name, uris []*url.URL, ttl time.Duration) (*x509.Certificate, error) {
 	clock := clock.New()
 	now := clock.Now()
 	serial, err := newSerialNumber()
@@ -188,12 +190,11 @@ func createX509Template(publicKey crypto.PublicKey, subject pkix.Name, uris []*u
 		SerialNumber:          serial,
 		Subject:               subject,
 		IsCA:                  false,
-		NotBefore:             now.Add(30 * time.Second),
+		NotBefore:             now,
 		NotAfter:              now.Add(ttl),
 		BasicConstraintsValid: true,
 		PublicKey:             publicKey,
 		URIs:                  uris,
-		DNSNames:              dnsNames,
 	}
 
 	template.KeyUsage = x509.KeyUsageKeyEncipherment |
@@ -206,7 +207,7 @@ func createX509Template(publicKey crypto.PublicKey, subject pkix.Name, uris []*u
 	return template, nil
 }
 
-// NewSerialNumber returns a new random serial number in the range [1, 2^63-1].
+// newSerialNumber returns a new random serial number in the range [1, 2^63-1].
 func newSerialNumber() (*big.Int, error) {
 	s, err := rand.Int(rand.Reader, getMaxBigInt64())
 	if err != nil {

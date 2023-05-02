@@ -25,6 +25,5 @@ type X509CertificateParams struct {
 	PublicKey crypto.PublicKey
 	Subject   pkix.Name
 	URIs      []*url.URL
-	DNSNames  []string
 	TTL       time.Duration
 }

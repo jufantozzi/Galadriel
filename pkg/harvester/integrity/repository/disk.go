@@ -3,7 +3,6 @@ package repository
 import (
 	"crypto"
 	"crypto/ecdsa"
-	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -12,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"math/big"
 	"net/url"
 	"time"
 
@@ -34,8 +32,6 @@ type Config struct {
 	CertFilePath string `hcl:"cert_file_path"`
 	//KeyPath is the path to the Root Key
 	KeyPath string `hcl:"key_file_path"`
-	//ValidationMaterialPath is the path to the TrustBundle to validate CA signed material
-	ValidationMaterialPath string `hcl:"validation_material_path"`
 }
 
 // New cretes a new disk that is not configured.
@@ -64,7 +60,7 @@ func (dc *disk) Configure(config *Config) error {
 		return err
 	}
 
-	validationMaterial, err := getValidationMaterial(config.ValidationMaterialPath)
+	validationMaterial, err := getValidationMaterial(config.CertFilePath)
 	if err != nil {
 		return err
 	}
@@ -99,16 +95,11 @@ func getRootKey(keyPath string) (crypto.Signer, error) {
 
 	switch keyType := key.(type) {
 	case *rsa.PrivateKey:
-		println("rsa key")
 		return key.(*rsa.PrivateKey), nil
 	case *ecdsa.PrivateKey:
-		println("ecdsa key")
 		return key.(*ecdsa.PrivateKey), nil
-	case *ed25519.PrivateKey:
-		println("ed25519 key")
-		return key.(*ed25519.PrivateKey), nil
 	default:
-		return nil, fmt.Errorf("this type of key is not supported: %s", keyType)
+		return nil, fmt.Errorf("key is not supported: %s", keyType)
 	}
 
 }
@@ -181,7 +172,7 @@ func (dc *disk) IssueSigningCertificate(params *X509CertificateParams) (*x509.Ce
 func createX509Template(publicKey crypto.PublicKey, subject pkix.Name, uris []*url.URL, ttl time.Duration) (*x509.Certificate, error) {
 	clock := clock.New()
 	now := clock.Now()
-	serial, err := newSerialNumber()
+	serial, err := NewSerialNumber()
 	if err != nil {
 		return nil, err
 	}
@@ -205,20 +196,6 @@ func createX509Template(publicKey crypto.PublicKey, subject pkix.Name, uris []*u
 	}
 
 	return template, nil
-}
-
-// newSerialNumber returns a new random serial number in the range [1, 2^63-1].
-func newSerialNumber() (*big.Int, error) {
-	s, err := rand.Int(rand.Reader, getMaxBigInt64())
-	if err != nil {
-		return nil, fmt.Errorf("failed to create random number: %w", err)
-	}
-
-	return s.Add(s, big.NewInt(1)), nil
-}
-
-func getMaxBigInt64() *big.Int {
-	return new(big.Int).SetInt64(1<<63 - 1)
 }
 
 func signX509(template, parent *x509.Certificate, signerPrivateKey crypto.PrivateKey) (*x509.Certificate, error) {

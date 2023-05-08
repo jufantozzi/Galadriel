@@ -13,7 +13,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const pathDir = "/tmp"
+const (
+	pathDir        = "/tmp"
+	tempCAKeyFile  = "/rootsignCAkey.key"
+	tempCACertFile = "/rootsignCAcert.crt"
+	tmpCASubject   = "Galadriel Harv Signing CA"
+)
 
 func TestNew(t *testing.T) {
 	_, err := New()
@@ -27,9 +32,17 @@ func TestConfigure(t *testing.T) {
 	assert.NoError(t, err)
 	err = d.Configure(&config)
 	assert.NoError(t, err)
+	// test path values
+	assert.Equal(t, config.CertFilePath, pathDir+tempCACertFile)
+	assert.Equal(t, config.KeyPath, pathDir+tempCAKeyFile)
+	// test that the values are not nil
 	assert.NotNil(t, d.rootSigner)
 	assert.NotNil(t, d.rootCertificate)
 	assert.NotNil(t, d.validationBundle)
+	//test that the values are the root certificate subject is the expected one
+	assert.Equal(t, tmpCASubject, d.rootCertificate.Subject.CommonName)
+	// test that the root signer is the expected one
+	assert.Equal(t, d.rootSigner.Public(), d.rootCertificate.PublicKey)
 
 }
 
@@ -39,11 +52,13 @@ func TestConfigureEmpty(t *testing.T) {
 	assert.NoError(t, err)
 	err = d.Configure(&config)
 	assert.Error(t, err)
+	// test that the error is the expected one
+	assert.Equal(t, "key path is not set", err.Error())
 
 }
 
 func TestIssueSigningCertificateRSA(t *testing.T) {
-	err := CreateRootCARSA(pathDir)
+	err := CreateRootCARSA(pathDir, tempCAKeyFile, tempCACertFile)
 	assert.NoError(t, err)
 
 	config := loadConfig(pathDir)
@@ -86,13 +101,12 @@ func TestIssueSigningCertificateRSA(t *testing.T) {
 	//test
 	validationCerts := d.RetrieveValidationMaterial()
 	assert.NotNil(t, validationCerts)
-	assert.Contains(t, validationCerts, d.rootCertificate)
 
 }
 
 func TestIssueSigningCertificateECDSA(t *testing.T) {
 	//createCA("EC", pathDir)
-	err := CreateRootCAECDSA(pathDir)
+	err := CreateRootCAECDSA(pathDir, tempCAKeyFile, tempCACertFile)
 	assert.NoError(t, err)
 
 	config := loadConfig(pathDir)
@@ -131,18 +145,17 @@ func TestIssueSigningCertificateECDSA(t *testing.T) {
 	//test the cert was issued to sign
 	assert.Contains(t, cert.ExtKeyUsage, x509.ExtKeyUsageCodeSigning)
 
-	//test
+	//test that the validation material is not nil
 	validationCerts := d.RetrieveValidationMaterial()
 	assert.NotNil(t, validationCerts)
-	assert.Contains(t, validationCerts, d.rootCertificate)
 
 }
 
 func loadConfig(pathDir string) Config {
 
 	config := Config{
-		CertFilePath: pathDir + "/rootsignCAcert.crt",
-		KeyPath:      pathDir + "/rootsignCAkey.key",
+		CertFilePath: pathDir + tempCACertFile,
+		KeyPath:      pathDir + tempCAKeyFile,
 	}
 
 	return config

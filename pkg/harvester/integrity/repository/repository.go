@@ -16,7 +16,7 @@ type SignCertProvider interface {
 
 // ValidationCertProvider provides a validation bundle to verify signing certificates.
 type ValidationCertProvider interface {
-	RetrieveValidationMaterial() ([]*x509.Certificate, error)
+	RetrieveValidationMaterial() ([]*x509.CertPool, error)
 }
 
 // X509CertificateParams holds the parameters for issuing an X509 certificate.

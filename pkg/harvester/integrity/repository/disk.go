@@ -24,7 +24,7 @@ type disk struct {
 	//rootCertificate is the  root certificate of the signing CA
 	rootCertificate *x509.Certificate
 	//validationBundle is the list of certificates to be used for validation of signing certificates
-	validationBundle []*x509.Certificate
+	validationBundle *x509.CertPool
 }
 
 type Config struct {
@@ -123,8 +123,9 @@ func getRootCert(certPath string) (*x509.Certificate, error) {
 	return certificate, nil
 }
 
-func getValidationMaterial(path string) ([]*x509.Certificate, error) {
-	var bundle []*x509.Certificate
+func getValidationMaterial(path string) (*x509.CertPool, error) {
+	//var bundle []*x509.CertPool
+	bundle := x509.NewCertPool()
 	bundlebytes, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -143,13 +144,14 @@ func getValidationMaterial(path string) ([]*x509.Certificate, error) {
 		}
 
 		if cert.IsCA {
-			bundle = append(bundle, cert)
+			//bundle = append(bundle, cert)
+			bundle.AddCert(cert)
 		}
 	}
 	return bundle, nil
 }
 
-func (dc *disk) RetrieveValidationMaterial() []*x509.Certificate {
+func (dc *disk) RetrieveValidationMaterial() *x509.CertPool {
 	return dc.validationBundle
 }
 
@@ -157,7 +159,7 @@ func (dc *disk) IssueSigningCertificate(params *X509CertificateParams) (*x509.Ce
 
 	template, err := createX509Template(params.PublicKey, params.Subject, params.URIs, params.TTL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create template for Server certificate: %w", err)
+		return nil, fmt.Errorf("failed to create template for certificate: %w", err)
 	}
 
 	cert, err := signX509(template, dc.rootCertificate, dc.rootSigner)

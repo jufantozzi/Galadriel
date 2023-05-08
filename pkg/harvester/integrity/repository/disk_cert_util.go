@@ -14,9 +14,14 @@ import (
 	"time"
 )
 
-func CreateRootCARSA(tempDir string) error {
+const (
+	textCert          = "CERTIFICATE"
+	textRSAPrivateKey = "RSA PRIVATE KEY"
+)
 
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2028)
+func CreateRootCARSA(tempDir string, tempKeyFile string, tempCertFile string) error {
+
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return err
 	}
@@ -27,7 +32,7 @@ func CreateRootCARSA(tempDir string) error {
 		return err
 	}
 
-	err = writeKeytoFile(keyBytes, tempDir)
+	err = writeKeyToFile(keyBytes, tempDir, tempKeyFile)
 	if err != nil {
 		return err
 	}
@@ -37,7 +42,7 @@ func CreateRootCARSA(tempDir string) error {
 		return err
 	}
 
-	err = writeCerttoFile(certBytes, tempDir)
+	err = writeCertToFile(certBytes, tempDir, tempCertFile)
 	if err != nil {
 		return err
 	}
@@ -45,7 +50,7 @@ func CreateRootCARSA(tempDir string) error {
 	return nil
 }
 
-func CreateRootCAECDSA(tempDir string) error {
+func CreateRootCAECDSA(tempDir string, tempKeyFile string, tempCertFile string) error {
 
 	curve := elliptic.P256()
 	privateKey, err := ecdsa.GenerateKey(curve, rand.Reader)
@@ -59,7 +64,7 @@ func CreateRootCAECDSA(tempDir string) error {
 		return err
 	}
 
-	err = writeKeytoFile(keyBytes, tempDir)
+	err = writeKeyToFile(keyBytes, tempDir, tempKeyFile)
 	if err != nil {
 		return err
 	}
@@ -69,7 +74,7 @@ func CreateRootCAECDSA(tempDir string) error {
 		return err
 	}
 
-	err = writeCerttoFile(certBytes, tempDir)
+	err = writeCertToFile(certBytes, tempDir, tempCertFile)
 	if err != nil {
 		return err
 	}
@@ -104,14 +109,14 @@ func createTemplateCA() x509.Certificate {
 	return template
 }
 
-func writeKeytoFile(keyBytes []byte, tempDir string) error {
-	keyFile, err := os.Create(tempDir + "/rootsignCAkey.key")
+func writeKeyToFile(keyBytes []byte, tempDir string, tempKeyFile string) error {
+	keyFile, err := os.Create(tempDir + tempKeyFile)
 	if err != nil {
 		return err
 	}
 
 	defer keyFile.Close()
-	err = pem.Encode(keyFile, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: keyBytes})
+	err = pem.Encode(keyFile, &pem.Block{Type: textRSAPrivateKey, Bytes: keyBytes})
 	if err != nil {
 		return err
 	}
@@ -119,14 +124,14 @@ func writeKeytoFile(keyBytes []byte, tempDir string) error {
 	return nil
 }
 
-func writeCerttoFile(certBytes []byte, tempDir string) error {
-	certFile, err := os.Create(tempDir + "/rootsignCAcert.crt")
+func writeCertToFile(certBytes []byte, tempDir string, tempCertFile string) error {
+	certFile, err := os.Create(tempDir + tempCertFile)
 	if err != nil {
 		return err
 	}
 
 	defer certFile.Close()
-	err = pem.Encode(certFile, &pem.Block{Type: "CERTIFICATE", Bytes: certBytes})
+	err = pem.Encode(certFile, &pem.Block{Type: textCert, Bytes: certBytes})
 	if err != nil {
 		return err
 	}
